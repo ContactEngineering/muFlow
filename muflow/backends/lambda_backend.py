@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from muflow.executor import ExecutionPayload
 
 try:
     import boto3
@@ -45,46 +48,35 @@ class LambdaBackend:
         self._bucket = bucket
         self._lambda = lambda_client or boto3.client("lambda")
 
-    def submit(self, analysis_id: int, payload: dict) -> str:
+    def submit(self, analysis_id: int, payload: "ExecutionPayload") -> str:
         """Invoke Lambda function asynchronously.
 
         Parameters
         ----------
         analysis_id : int
             Database ID of the WorkflowResult.
-        payload : dict
-            Execution payload. Must contain:
-            - function: workflow function name
-            - kwargs: workflow parameters
-            - storage_prefix: S3 prefix for outputs
-            - dependency_prefixes: dict of dep key -> S3 prefix
-            - subject_data_key: S3 key for subject data (optional)
+        payload : ExecutionPayload
+            Workflow execution payload.
 
         Returns
         -------
         str
             AWS Request ID for the invocation.
         """
-        # Build Lambda event
+        # Build Lambda event from ExecutionPayload
         event = {
             "analysis_id": analysis_id,
-            "function": payload["function"],
-            "kwargs": payload["kwargs"],
-            "storage_prefix": payload["storage_prefix"],
-            "dependency_prefixes": payload.get("dependency_prefixes", {}),
-            "bucket": payload.get("bucket", self._bucket),
+            "workflow_name": payload.workflow_name,
+            "kwargs": payload.kwargs,
+            "storage_prefix": payload.storage_prefix,
+            "dependency_prefixes": payload.dependency_prefixes,
+            "allowed_outputs": list(payload.allowed_outputs),
+            "bucket": self._bucket,
         }
-
-        # Include subject data key if provided
-        if "subject_data_key" in payload:
-            event["subject_data_key"] = payload["subject_data_key"]
-
-        # Allow override of Lambda function name
-        function_name = payload.get("lambda_function", self._function_name)
 
         # Invoke asynchronously
         response = self._lambda.invoke(
-            FunctionName=function_name,
+            FunctionName=self._function_name,
             InvocationType="Event",  # Async
             Payload=json.dumps(event),
         )
@@ -130,7 +122,7 @@ def create_lambda_handler(workflow_registry: dict):
     Parameters
     ----------
     workflow_registry : dict
-        Mapping from workflow function name to implementation class.
+        Mapping from workflow name to implementation class.
 
     Returns
     -------
@@ -146,44 +138,60 @@ def create_lambda_handler(workflow_registry: dict):
     ... })
     """
     from muflow.context import S3WorkflowContext
+    from muflow.executor import ExecutionPayload, execute_workflow
 
     def handler(event, context):
         """Lambda handler for workflow execution.
 
-        Event structure:
+        Event structure (matches ExecutionPayload + Lambda-specific fields):
         {
             "analysis_id": 123,
-            "function": "sds_ml.v3.gpr.training",
+            "workflow_name": "sds_ml.v3.gpr.training",
             "kwargs": {...},
             "storage_prefix": "data-lake/results/...",
             "dependency_prefixes": {"dep1": "data-lake/..."},
-            "bucket": "my-bucket",
-            "subject_data_key": "data-lake/subjects/..." (optional)
+            "allowed_outputs": ["result.json", "model.nc"],
+            "bucket": "my-bucket"
         }
         """
-        function_name = event["function"]
+        workflow_name = event["workflow_name"]
 
-        if function_name not in workflow_registry:
-            raise ValueError(f"Unknown workflow: {function_name}")
+        if workflow_name not in workflow_registry:
+            raise ValueError(f"Unknown workflow: {workflow_name}")
+
+        # Reconstruct ExecutionPayload from event
+        payload = ExecutionPayload(
+            workflow_name=workflow_name,
+            kwargs=event["kwargs"],
+            storage_prefix=event["storage_prefix"],
+            dependency_prefixes=event.get("dependency_prefixes", {}),
+            allowed_outputs=set(event.get("allowed_outputs", [])),
+        )
 
         # Create S3 context
         ctx = S3WorkflowContext(
-            storage_prefix=event["storage_prefix"],
-            kwargs=event["kwargs"],
-            dependency_prefixes=event.get("dependency_prefixes", {}),
+            storage_prefix=payload.storage_prefix,
+            kwargs=payload.kwargs,
+            dependency_prefixes=payload.dependency_prefixes,
             bucket=event["bucket"],
+            allowed_outputs=payload.allowed_outputs,
         )
 
-        # Get workflow implementation
-        impl_class = workflow_registry[function_name]
-        impl = impl_class(**event["kwargs"])
+        # Execute using the pure execution function
+        result = execute_workflow(
+            payload=payload,
+            context=ctx,
+            get_implementation=lambda name: workflow_registry[name],
+        )
 
-        # Execute
-        impl.eval(ctx)
+        if not result.success:
+            # Re-raise the error for Lambda to handle
+            raise RuntimeError(result.error_message)
 
         return {
             "status": "success",
             "analysis_id": event["analysis_id"],
+            "files_written": result.files_written,
         }
 
     return handler

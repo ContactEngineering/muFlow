@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+from typing import Optional
+
+import pydantic
 
 
-@dataclass
-class WorkflowNode:
+class WorkflowNode(pydantic.BaseModel):
     """A single node in the execution plan.
 
     Attributes
@@ -42,29 +42,30 @@ class WorkflowNode:
         Database ID of the WorkflowResult (set after DB record creation).
     """
 
+    model_config = pydantic.ConfigDict(extra="forbid")
+
     key: str
     function: str
     subject_key: str
     kwargs: dict
     storage_prefix: str
-    depends_on: list[str] = field(default_factory=list)
-    depended_on_by: list[str] = field(default_factory=list)
-    output_files: list[str] = field(default_factory=list)
+    depends_on: list[str] = []
+    depended_on_by: list[str] = []
+    output_files: list[str] = []
     cached: bool = False
     analysis_id: Optional[int] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return asdict(self)
+        return self.model_dump(mode="json")
 
     @classmethod
     def from_dict(cls, data: dict) -> WorkflowNode:
         """Create from dictionary."""
-        return cls(**data)
+        return cls.model_validate(data)
 
 
-@dataclass
-class WorkflowPlan:
+class WorkflowPlan(pydantic.BaseModel):
     """A complete, static execution DAG.
 
     The plan is computed once by the WorkflowPlanner and stored as JSON.
@@ -80,6 +81,8 @@ class WorkflowPlan:
     root_key : str
         Key of the root node (the one the user requested).
     """
+
+    model_config = pydantic.ConfigDict(extra="forbid")
 
     nodes: dict[str, WorkflowNode]
     root_key: str
@@ -161,25 +164,21 @@ class WorkflowPlan:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
-            "root_key": self.root_key,
-            "nodes": {k: v.to_dict() for k, v in self.nodes.items()},
-        }
+        return self.model_dump(mode="json")
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
-        return json.dumps(self.to_dict(), sort_keys=True)
+        return self.model_dump_json()
 
     @classmethod
     def from_dict(cls, data: dict) -> WorkflowPlan:
         """Create from dictionary."""
-        nodes = {k: WorkflowNode.from_dict(v) for k, v in data["nodes"].items()}
-        return cls(nodes=nodes, root_key=data["root_key"])
+        return cls.model_validate(data)
 
     @classmethod
     def from_json(cls, s: str) -> WorkflowPlan:
         """Deserialize from JSON string."""
-        return cls.from_dict(json.loads(s))
+        return cls.model_validate_json(s)
 
 
 def compute_storage_prefix(

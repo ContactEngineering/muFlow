@@ -76,6 +76,12 @@ from muflow.executor import (
 from muflow.backends import ExecutionBackend
 from muflow.backends.base import LocalBackend
 
+# Lambda backend factory (requires boto3)
+try:
+    from muflow.backends.lambda_backend import create_lambda_handler
+except ImportError:
+    pass
+
 # I/O utilities
 from muflow.io import (
     ExtendedJSONEncoder,
@@ -122,6 +128,24 @@ __all__ = [
 # Optional: LambdaBackend (requires boto3)
 try:
     from muflow.backends import LambdaBackend
-    __all__.append("LambdaBackend")
+    __all__.extend(["LambdaBackend", "create_lambda_handler"])
+except ImportError:
+    pass
+
+# Optional: CeleryBackend (requires celery)
+try:
+    from muflow.backends import CeleryBackend, create_celery_task
+    from muflow.backends.callbacks import (
+        CompletionCallback,
+        CeleryCompletionCallback,
+        NoOpCompletionCallback,
+    )
+    __all__.extend([
+        "CeleryBackend",
+        "create_celery_task",
+        "CompletionCallback",
+        "CeleryCompletionCallback",
+        "NoOpCompletionCallback",
+    ])
 except ImportError:
     pass

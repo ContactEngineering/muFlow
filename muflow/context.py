@@ -403,5 +403,34 @@ class S3WorkflowContext:
         )
 
     def report_progress(self, current: int, total: int, message: str = "") -> None:
-        """Report progress (no-op for S3/Lambda - no progress channel)."""
-        pass
+        """Report progress by writing to S3.
+
+        Writes a _progress.json file that can be polled by the frontend
+        or orchestration layer to track workflow progress.
+
+        Parameters
+        ----------
+        current : int
+            Current progress value.
+        total : int
+            Total value for progress calculation.
+        message : str
+            Optional progress message.
+        """
+        from datetime import datetime, timezone
+        progress_data = {
+            "current": current,
+            "total": total,
+            "message": message,
+            "percentage": (current / total * 100) if total > 0 else 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        # Use put_object directly to avoid allowed_outputs validation
+        # since _progress.json is an internal file
+        body = dumps_json(progress_data).encode("utf-8")
+        self._s3.put_object(
+            Bucket=self._bucket,
+            Key=self._key("_progress.json"),
+            Body=body,
+            ContentType="application/json",
+        )

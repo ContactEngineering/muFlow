@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from muflow.executor import ExecutionPayload
 
 
 @runtime_checkable
@@ -26,23 +29,21 @@ class ExecutionBackend(Protocol):
     - LocalBackend: Runs synchronously (for testing)
     """
 
-    def submit(self, analysis_id: int, payload: dict) -> str:
+    def submit(self, analysis_id: int, payload: "ExecutionPayload") -> str:
         """Submit a workflow node for execution.
 
         Parameters
         ----------
         analysis_id : int
-            Database ID of the WorkflowResult.
-        payload : dict
-            Backend-specific payload containing:
-            - function: workflow function name
+            Database ID of the WorkflowResult. Used for tracking and
+            callbacks after execution completes.
+        payload : ExecutionPayload
+            Workflow execution payload containing:
+            - workflow_name: name of workflow to execute
             - kwargs: workflow parameters
             - storage_prefix: where to write outputs
             - dependency_prefixes: dict of dependency key -> prefix
-            - subject_data_key: S3 key for subject data (if applicable)
-            - bucket: S3 bucket name
-            - queue: task queue name (for Celery)
-            - lambda_function: Lambda function name (for Lambda)
+            - allowed_outputs: set of filenames workflow can write
 
         Returns
         -------
@@ -89,21 +90,22 @@ class LocalBackend:
         Parameters
         ----------
         executor_fn : callable, optional
-            Function that takes (analysis_id, payload) and executes the
-            workflow. If not provided, submit() will raise NotImplementedError.
+            Function that takes (analysis_id, payload: ExecutionPayload) and
+            executes the workflow. If not provided, submit() will raise
+            NotImplementedError.
         """
         self._executor_fn = executor_fn
         self._states = {}  # task_id -> state
 
-    def submit(self, analysis_id: int, payload: dict) -> str:
+    def submit(self, analysis_id: int, payload: "ExecutionPayload") -> str:
         """Execute workflow synchronously.
 
         Parameters
         ----------
         analysis_id : int
             Database ID of the WorkflowResult.
-        payload : dict
-            Execution payload.
+        payload : ExecutionPayload
+            Workflow execution payload.
 
         Returns
         -------
