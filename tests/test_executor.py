@@ -1,5 +1,6 @@
 """Tests for the pure execution function."""
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -58,7 +59,6 @@ class TestExecutionPayload:
         assert payload.kwargs == {"param": "value"}
         assert payload.storage_prefix == "results/test"
         assert payload.dependency_prefixes == {}
-        assert payload.allowed_outputs == set()
 
     def test_to_dict(self):
         """Should serialize to dictionary."""
@@ -67,7 +67,6 @@ class TestExecutionPayload:
             kwargs={"param": "value"},
             storage_prefix="results/test",
             dependency_prefixes={"dep1": "results/dep1"},
-            allowed_outputs={"result.json", "model.nc"},
         )
         d = payload.to_dict()
 
@@ -75,7 +74,6 @@ class TestExecutionPayload:
         assert d["kwargs"] == {"param": "value"}
         assert d["storage_prefix"] == "results/test"
         assert d["dependency_prefixes"] == {"dep1": "results/dep1"}
-        assert set(d["allowed_outputs"]) == {"result.json", "model.nc"}
 
     def test_from_dict(self):
         """Should deserialize from dictionary."""
@@ -84,7 +82,6 @@ class TestExecutionPayload:
             "kwargs": {"param": "value"},
             "storage_prefix": "results/test",
             "dependency_prefixes": {"dep1": "results/dep1"},
-            "allowed_outputs": ["result.json", "model.nc"],
         }
         payload = ExecutionPayload.from_dict(d)
 
@@ -92,7 +89,6 @@ class TestExecutionPayload:
         assert payload.kwargs == {"param": "value"}
         assert payload.storage_prefix == "results/test"
         assert payload.dependency_prefixes == {"dep1": "results/dep1"}
-        assert payload.allowed_outputs == {"result.json", "model.nc"}
 
     def test_roundtrip(self):
         """Should survive serialization roundtrip."""
@@ -101,7 +97,6 @@ class TestExecutionPayload:
             kwargs={"param": "value"},
             storage_prefix="results/test",
             dependency_prefixes={"dep1": "results/dep1"},
-            allowed_outputs={"result.json"},
         )
         restored = ExecutionPayload.from_dict(original.to_dict())
 
@@ -109,7 +104,6 @@ class TestExecutionPayload:
         assert restored.kwargs == original.kwargs
         assert restored.storage_prefix == original.storage_prefix
         assert restored.dependency_prefixes == original.dependency_prefixes
-        assert restored.allowed_outputs == original.allowed_outputs
 
 
 class TestExecutionResult:
@@ -174,14 +168,9 @@ class TestExecuteWorkflow:
                 workflow_name="test.mock_workflow",
                 kwargs={"user_id": 42},
                 storage_prefix=tmpdir,
-                allowed_outputs={"result.json"},
             )
 
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs=payload.kwargs,
-                allowed_outputs=payload.allowed_outputs,
-            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
@@ -194,6 +183,23 @@ class TestExecuteWorkflow:
             assert data["status"] == "ok"
             assert data["user_id"] == 42
 
+    def test_successful_execution_writes_manifest(self):
+        """Should write manifest.json after execution."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            payload = ExecutionPayload(
+                workflow_name="test.mock_workflow",
+                kwargs={"user_id": 1},
+                storage_prefix=tmpdir,
+            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
+
+            execute_workflow(payload, ctx, get_test_implementation)
+
+            manifest_path = Path(tmpdir) / "manifest.json"
+            assert manifest_path.exists()
+            manifest = json.loads(manifest_path.read_text())
+            assert "result.json" in manifest["files"]
+
     def test_failed_execution(self):
         """Should catch exceptions and return failure result."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -203,10 +209,7 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
@@ -214,6 +217,21 @@ class TestExecuteWorkflow:
             assert "Intentional failure" in result.error_message
             assert result.error_traceback is not None
             assert "ValueError" in result.error_traceback
+
+    def test_failed_execution_still_writes_manifest(self):
+        """Should write manifest.json even on failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            payload = ExecutionPayload(
+                workflow_name="test.failing_workflow",
+                kwargs={},
+                storage_prefix=tmpdir,
+            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+
+            execute_workflow(payload, ctx, get_test_implementation)
+
+            manifest_path = Path(tmpdir) / "manifest.json"
+            assert manifest_path.exists()
 
     def test_unknown_workflow(self):
         """Should return failure for unknown workflow."""
@@ -224,25 +242,22 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
             assert result.success is False
             assert "nonexistent.workflow" in result.error_message
 
-    def test_output_guard_violation(self):
-        """Should fail if workflow writes undeclared file."""
+    def test_protected_file_write_fails(self):
+        """Workflow that writes to a protected file should fail."""
 
         class BadWorkflow(WorkflowImplementation):
             class Meta:
                 name = "test.bad_workflow"
 
             def execute(self, ctx):
-                ctx.save_json("undeclared.json", {})
+                ctx.save_json("context.json", {})
 
         registry = {"test.bad_workflow": BadWorkflow}
 
@@ -251,17 +266,11 @@ class TestExecuteWorkflow:
                 workflow_name="test.bad_workflow",
                 kwargs={},
                 storage_prefix=tmpdir,
-                allowed_outputs={"allowed.json"},  # Not 'undeclared.json'
             )
 
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-                allowed_outputs=payload.allowed_outputs,
-            )
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, lambda name: registry[name])
 
             assert result.success is False
-            assert "undeclared.json" in result.error_message
-            assert "PermissionError" in result.error_traceback
+            assert "protected" in result.error_message

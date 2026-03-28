@@ -1,12 +1,12 @@
 """Workflow context protocol.
 
-The WorkflowContext protocol defines the interface that workflow implementations
-use for file I/O, parameter access, and dependency access. This abstraction
-allows the same workflow code to run on different backends:
+The WorkflowContext protocol defines the interface that workflow functions
+receive.  It provides file I/O (delegated to a storage backend), dependency
+access, progress reporting, and validated parameters.
 
-- DjangoWorkflowContext: Uses Django ORM (in topobank, not here)
-- S3WorkflowContext: Direct S3 access via boto3 (for Lambda/Batch)
-- LocalFolderContext: Local filesystem (for testing)
+The protocol is deliberately domain-agnostic.  Domain-specific contexts
+(e.g. TopographyContext, SurfaceContext) are defined downstream in
+sds-workflows, not here.
 """
 
 from __future__ import annotations
@@ -15,48 +15,45 @@ from typing import IO, Any, Protocol, runtime_checkable
 
 import xarray as xr
 
+from muflow.storage.base import StorageBackend
+
 
 @runtime_checkable
 class WorkflowContext(Protocol):
-    """Abstract interface for workflow file I/O.
+    """Abstract interface for workflow execution contexts.
 
-    Workflow implementations receive a WorkflowContext and use it for all
-    file operations. The context handles storage backend details, allowing
-    the same workflow code to run on Celery (with Django), Lambda (with S3),
-    or locally (for testing).
-
-    This is a Protocol (structural typing), so implementations don't need
-    to inherit from it - they just need to implement the methods.
-
-    Output Guards
-    -------------
-    The `allowed_outputs` property controls which files a workflow can write:
-    - None: No restriction (backward compatibility mode)
-    - set(): Read-only context (used for dependency access)
-    - set(["file1.json", "file2.nc"]): Only these files can be written
+    A context wraps a ``StorageBackend`` and adds workflow-level concerns:
+    validated parameters, dependency access, and progress reporting.
+    Implementations delegate file I/O to the storage backend, which enforces
+    path traversal protection, write-once semantics, and protected files.
     """
 
     @property
+    def storage(self) -> StorageBackend:
+        """The underlying storage backend."""
+        ...
+
+    @property
     def storage_prefix(self) -> str:
-        """S3 key prefix or local path for this workflow's output files."""
+        """Root path or S3 prefix for this workflow's output files."""
         ...
 
     @property
     def kwargs(self) -> dict:
-        """Parameters passed to this workflow."""
+        """Raw parameters dict passed to this workflow."""
         ...
 
     @property
-    def allowed_outputs(self) -> set[str] | None:
-        """Set of filenames this workflow is allowed to write.
+    def parameters(self) -> Any:
+        """Validated parameters (pydantic model), or None.
 
-        Returns None if all writes are allowed (backward compatibility).
-        Returns empty set if context is read-only (dependency contexts).
-        Returns set of filenames if writes are restricted to declared outputs.
+        Set by the executor after parameter validation.  Workflow functions
+        should prefer ``context.parameters.my_param`` over ``context.kwargs``.
         """
         ...
 
-    # File I/O
+    # ── File I/O (delegated to storage backend) ─────────────────────────
+
     def save_file(self, filename: str, data: bytes) -> None:
         """Save raw bytes to a file."""
         ...
@@ -89,12 +86,14 @@ class WorkflowContext(Protocol):
         """Check if a file exists."""
         ...
 
-    # Dependency access
+    # ── Dependency access ───────────────────────────────────────────────
+
     def dependency(self, key: str) -> WorkflowContext:
         """Get a context for accessing a completed dependency's outputs."""
         ...
 
-    # Progress reporting
+    # ── Progress reporting ──────────────────────────────────────────────
+
     def report_progress(self, current: int, total: int, message: str = "") -> None:
         """Report progress (may be no-op on serverless backends)."""
         ...

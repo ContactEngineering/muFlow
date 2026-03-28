@@ -1,22 +1,22 @@
 """Workflow context abstractions.
 
-This package provides the WorkflowContext protocol and its implementations.
-The protocol is separated from the implementations so that domain-specific
-contexts (e.g. TopographyContext, DjangoWorkflowContext) can extend
-LocalFolderContext with additional properties without pulling in unrelated
-backend dependencies.
+This package provides the ``WorkflowContext`` protocol and its
+implementations.  Each context wraps a ``StorageBackend`` (from
+``muflow.storage``) and adds workflow-level concerns: validated parameters,
+dependency access, and progress reporting.
+
+The protocol is domain-agnostic.  Domain-specific contexts (e.g.
+``TopographyContext``, ``SurfaceContext``) live downstream in sds-workflows.
 
 Modules
 -------
 base
-    WorkflowContext protocol — the abstract interface that all contexts
-    implement.  Workflows depend only on this protocol.
+    ``WorkflowContext`` protocol — the abstract interface that all contexts
+    implement.
 local
-    LocalFolderContext — backed by the local filesystem.  Useful for testing
-    and for the ``sds-workflows`` command-line runner.
+    ``LocalFolderContext`` — backed by a ``LocalStorageBackend``.
 s3
-    S3WorkflowContext — backed by AWS S3 via boto3.  Used by Lambda and
-    Batch backends.
+    ``S3WorkflowContext`` — backed by an ``S3StorageBackend``.
 """
 
 from muflow.context.base import WorkflowContext

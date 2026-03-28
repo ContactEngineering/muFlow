@@ -41,6 +41,13 @@ Example
 
 __version__ = "0.1.0"
 
+# Storage backends
+from muflow.storage import (
+    StorageBackend,
+    LocalStorageBackend,
+    S3StorageBackend,
+)
+
 # Core context abstractions
 from muflow.context import (
     WorkflowContext,
@@ -94,6 +101,10 @@ from muflow.io import (
 __all__ = [
     # Version
     "__version__",
+    # Storage
+    "StorageBackend",
+    "LocalStorageBackend",
+    "S3StorageBackend",
     # Context
     "WorkflowContext",
     "LocalFolderContext",

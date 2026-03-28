@@ -156,71 +156,41 @@ class TestLocalFolderContext:
             assert path.exists()
 
 
-class TestOutputGuards:
-    """Tests for output file validation."""
+class TestStorageSafetyViaContext:
+    """Tests for storage backend safety features accessed through the context."""
 
-    def test_allowed_outputs_none_allows_all(self):
-        """With allowed_outputs=None, all writes should be allowed."""
+    def test_write_once_via_context(self):
+        """Context delegates write-once enforcement to the storage backend."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = LocalFolderContext(path=tmpdir, kwargs={}, allowed_outputs=None)
-            assert ctx.allowed_outputs is None
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx.save_json("data.json", {"v": 1})
+            with pytest.raises(FileExistsError):
+                ctx.save_json("data.json", {"v": 2})
 
-            # All writes should work
-            ctx.save_json("any_file.json", {"key": "value"})
-            ctx.save_file("any_file.bin", b"data")
-            assert ctx.exists("any_file.json")
-            assert ctx.exists("any_file.bin")
-
-    def test_allowed_outputs_restricts_writes(self):
-        """With allowed_outputs set, only declared files can be written."""
+    def test_protected_files_via_context(self):
+        """Context delegates protected-file enforcement to the storage backend."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-                allowed_outputs={"result.json", "model.nc"},
-            )
-            assert ctx.allowed_outputs == {"result.json", "model.nc"}
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            with pytest.raises(PermissionError, match="protected"):
+                ctx.save_json("context.json", {})
+            with pytest.raises(PermissionError, match="protected"):
+                ctx.save_json("manifest.json", {})
 
-            # Allowed writes should work
-            ctx.save_json("result.json", {"key": "value"})
-            assert ctx.exists("result.json")
-
-            # Disallowed writes should raise PermissionError
-            with pytest.raises(PermissionError, match="undeclared.json"):
-                ctx.save_json("undeclared.json", {"key": "value"})
-
-    def test_allowed_outputs_empty_set_is_read_only(self):
-        """With allowed_outputs=set(), context should be read-only."""
+    def test_path_traversal_via_context(self):
+        """Context delegates path traversal protection to the storage backend."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Write a file first
-            ctx_write = LocalFolderContext(path=tmpdir, kwargs={})
-            ctx_write.save_json("existing.json", {"key": "value"})
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            with pytest.raises(ValueError, match="traversal"):
+                ctx.save_json("../escape.json", {})
 
-            # Create read-only context
-            ctx_readonly = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-                allowed_outputs=set(),
-            )
-
-            # Reading should work
-            data = ctx_readonly.read_json("existing.json")
-            assert data == {"key": "value"}
-
-            # Writing should raise PermissionError
-            with pytest.raises(PermissionError, match="read-only"):
-                ctx_readonly.save_json("new.json", {"key": "value"})
-
-    def test_dependency_context_is_read_only(self):
-        """Dependency contexts should be read-only."""
+    def test_dependency_reading_works(self):
+        """Dependency contexts can read existing files."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create dependency output
             dep_path = Path(tmpdir) / "dependency"
             dep_path.mkdir()
             dep_ctx = LocalFolderContext(path=str(dep_path), kwargs={})
             dep_ctx.save_json("result.json", {"dep_value": 123})
 
-            # Create main context with dependency
             main_path = Path(tmpdir) / "main"
             main_ctx = LocalFolderContext(
                 path=str(main_path),
@@ -228,44 +198,14 @@ class TestOutputGuards:
                 dependency_paths={"dep1": str(dep_path)},
             )
 
-            # Get dependency context
             dep = main_ctx.dependency("dep1")
-
-            # Reading should work
             result = dep.read_json("result.json")
             assert result == {"dep_value": 123}
 
-            # Writing should fail - dependency context is read-only
-            with pytest.raises(PermissionError, match="read-only"):
-                dep.save_json("new.json", {"key": "value"})
-
-    def test_output_validation_on_save_file(self):
-        """save_file should validate against allowed_outputs."""
+    def test_storage_property(self):
+        """Context exposes the storage backend."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-                allowed_outputs={"allowed.bin"},
-            )
-
-            ctx.save_file("allowed.bin", b"data")
-            assert ctx.exists("allowed.bin")
-
-            with pytest.raises(PermissionError):
-                ctx.save_file("notallowed.bin", b"data")
-
-    def test_output_validation_on_save_xarray(self):
-        """save_xarray should validate against allowed_outputs."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = LocalFolderContext(
-                path=tmpdir,
-                kwargs={},
-                allowed_outputs={"allowed.nc"},
-            )
-
-            ds = xr.Dataset({"data": (["x"], [1, 2, 3])})
-            ctx.save_xarray("allowed.nc", ds)
-            assert ctx.exists("allowed.nc")
-
-            with pytest.raises(PermissionError):
-                ctx.save_xarray("notallowed.nc", ds)
+            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            assert ctx.storage is not None
+            ctx.save_json("test.json", {})
+            assert "test.json" in ctx.storage.written_files
