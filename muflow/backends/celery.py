@@ -211,8 +211,9 @@ def create_celery_task(
     >>>
     >>> # Now workers can receive muflow.execute_workflow_task
     """
-    from muflow.context import S3WorkflowContext
+    from muflow.context import WorkflowContext
     from muflow.executor import execute_workflow
+    from muflow.storage import S3StorageBackend
 
     @celery_app.task(name=task_name, bind=True)
     def execute_workflow_task(
@@ -258,12 +259,17 @@ def create_celery_task(
                 on_complete(analysis_id, result)
             raise ValueError(error_msg)
 
-        # Create S3 context (same as Lambda handler)
-        ctx = S3WorkflowContext(
-            storage_prefix=payload.storage_prefix,
+        # Create storage backends
+        storage = S3StorageBackend(payload.storage_prefix, bucket)
+        dep_storages = {
+            key: S3StorageBackend(prefix, bucket)
+            for key, prefix in payload.dependency_prefixes.items()
+        }
+
+        ctx = WorkflowContext(
+            storage=storage,
             kwargs=payload.kwargs,
-            dependency_prefixes=payload.dependency_prefixes,
-            bucket=bucket,
+            dependency_storages=dep_storages,
         )
 
         # Execute using the pure execution function

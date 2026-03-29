@@ -7,17 +7,18 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from muflow import LocalFolderContext, WorkflowContext
+from muflow import LocalFolderContext, WorkflowContext, create_local_context
+from muflow.context import WorkflowContextProtocol
 
 
 class TestLocalFolderContext:
-    """Tests for LocalFolderContext."""
+    """Tests for LocalFolderContext (deprecated)."""
 
     def test_implements_protocol(self):
         """LocalFolderContext should implement WorkflowContext protocol."""
         with tempfile.TemporaryDirectory() as tmpdir:
             ctx = LocalFolderContext(path=tmpdir, kwargs={})
-            assert isinstance(ctx, WorkflowContext)
+            assert isinstance(ctx, WorkflowContextProtocol)
 
     def test_storage_prefix(self):
         """storage_prefix should return the path."""

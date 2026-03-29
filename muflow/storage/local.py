@@ -28,6 +28,10 @@ class LocalStorageBackend:
     base_prefix : str
         Base prefix passed to ``compute_prefix``.  Only used when
         *hash_dict* is provided.
+    allowed_outputs : set[str] | None
+        If provided, only these filenames can be written. An empty set
+        means read-only (no writes allowed). ``None`` means no restriction
+        (backward compatible).
     """
 
     def __init__(
@@ -35,6 +39,7 @@ class LocalStorageBackend:
         path: Union[str, Path],
         hash_dict: dict = None,
         base_prefix: str = "muflow",
+        allowed_outputs: set[str] = None,
     ):
         if hash_dict is not None:
             self._path = Path(path) / compute_prefix(hash_dict, base_prefix)
@@ -42,6 +47,7 @@ class LocalStorageBackend:
             self._path = Path(path)
         self._path.mkdir(parents=True, exist_ok=True)
         self._written_files: set[str] = set()
+        self._allowed_outputs = allowed_outputs
 
     @property
     def storage_prefix(self) -> str:
@@ -54,11 +60,32 @@ class LocalStorageBackend:
     def _full_path(self, filename: str) -> Path:
         return self._path / filename
 
+    def _validate_allowed(self, filename: str) -> None:
+        """Validate that the file is in the allowed outputs set.
+
+        Raises
+        ------
+        PermissionError
+            If the file is not in the allowed outputs set.
+        """
+        if self._allowed_outputs is None:
+            return  # No restriction
+        if not self._allowed_outputs:
+            raise PermissionError(
+                f"Attempted to write '{filename}' to a read-only context"
+            )
+        if filename not in self._allowed_outputs:
+            raise PermissionError(
+                f"Workflow attempted to write '{filename}' but only "
+                f"{sorted(self._allowed_outputs)} are declared in outputs"
+            )
+
     # ── Write methods ───────────────────────────────────────────────────
 
     def save_file(self, filename: str, data: bytes) -> None:
         validate_filename(filename)
         validate_writable(filename, self._written_files)
+        self._validate_allowed(filename)
         path = self._full_path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -67,6 +94,7 @@ class LocalStorageBackend:
     def save_json(self, filename: str, data: Any) -> None:
         validate_filename(filename)
         validate_writable(filename, self._written_files)
+        self._validate_allowed(filename)
         path = self._full_path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(dumps_json(data, indent=2))
@@ -75,6 +103,7 @@ class LocalStorageBackend:
     def save_xarray(self, filename: str, dataset: xr.Dataset) -> None:
         validate_filename(filename)
         validate_writable(filename, self._written_files)
+        self._validate_allowed(filename)
         path = self._full_path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
         save_xarray_to_file(dataset, str(path))

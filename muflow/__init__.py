@@ -53,6 +53,7 @@ from muflow.storage import (
 from muflow.context import (
     WorkflowContext,
     ParameterizedMixin,
+    create_local_context,
     LocalFolderContext,
     S3WorkflowContext,
 )
@@ -112,8 +113,9 @@ __all__ = [
     # Context
     "WorkflowContext",
     "ParameterizedMixin",
-    "LocalFolderContext",
-    "S3WorkflowContext",
+    "create_local_context",
+    "LocalFolderContext",  # Deprecated
+    "S3WorkflowContext",  # Deprecated
     # Workflow
     "WorkflowImplementation",
     # Outputs

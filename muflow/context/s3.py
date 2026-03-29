@@ -1,7 +1,12 @@
-"""S3 workflow context."""
+"""S3 workflow context.
+
+.. deprecated::
+    Use ``WorkflowContext`` with ``S3StorageBackend`` instead.
+"""
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime, timezone
 from typing import IO, Any
 
@@ -43,6 +48,12 @@ class S3WorkflowContext(ParameterizedMixin):
         s3_client=None,
         storage: S3StorageBackend = None,
     ):
+        warnings.warn(
+            "S3WorkflowContext is deprecated. Use WorkflowContext with "
+            "S3StorageBackend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._storage = storage or S3StorageBackend(
             storage_prefix, bucket, s3_client
         )

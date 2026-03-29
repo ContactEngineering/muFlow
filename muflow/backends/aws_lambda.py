@@ -111,8 +111,9 @@ def create_lambda_handler(workflow_registry: dict):
     callable
         Lambda handler function.
     """
-    from muflow.context import S3WorkflowContext
+    from muflow.context import WorkflowContext
     from muflow.executor import ExecutionPayload, execute_workflow
+    from muflow.storage import S3StorageBackend
 
     def handler(event, context):
         """Lambda handler for workflow execution."""
@@ -128,11 +129,19 @@ def create_lambda_handler(workflow_registry: dict):
             dependency_prefixes=event.get("dependency_prefixes", {}),
         )
 
-        ctx = S3WorkflowContext(
-            storage_prefix=payload.storage_prefix,
+        bucket = event["bucket"]
+
+        # Create storage backends
+        storage = S3StorageBackend(payload.storage_prefix, bucket)
+        dep_storages = {
+            key: S3StorageBackend(prefix, bucket)
+            for key, prefix in payload.dependency_prefixes.items()
+        }
+
+        ctx = WorkflowContext(
+            storage=storage,
             kwargs=payload.kwargs,
-            dependency_prefixes=payload.dependency_prefixes,
-            bucket=event["bucket"],
+            dependency_storages=dep_storages,
         )
 
         result = execute_workflow(

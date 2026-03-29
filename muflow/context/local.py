@@ -1,7 +1,12 @@
-"""Local filesystem workflow context."""
+"""Local filesystem workflow context.
+
+.. deprecated::
+    Use ``WorkflowContext`` with ``LocalStorageBackend`` instead.
+"""
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import IO, Any, Union
 
@@ -37,6 +42,12 @@ class LocalFolderContext(ParameterizedMixin):
         dependency_paths: dict[str, str] = None,
         storage: LocalStorageBackend = None,
     ):
+        warnings.warn(
+            "LocalFolderContext is deprecated. Use WorkflowContext with "
+            "LocalStorageBackend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._storage = storage or LocalStorageBackend(path)
         self._kwargs = kwargs
         self._dependency_paths = dependency_paths or {}

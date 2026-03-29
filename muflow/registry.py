@@ -63,6 +63,9 @@ class WorkflowEntry:
     parameters : type[pydantic.BaseModel] | None
         Pydantic model for parameter validation.  ``None`` means no
         parameters.
+    outputs : type | None
+        An inner ``Outputs`` class with a ``files`` dict mapping filenames
+        to ``OutputFile`` descriptors.  Used for output validation.
     """
 
     name: str
@@ -71,6 +74,7 @@ class WorkflowEntry:
     queue: str = "default"
     dependencies: dict = field(default_factory=dict)
     parameters: Optional[Type[pydantic.BaseModel]] = None
+    outputs: Optional[Type] = None
 
 
 # ── Registry storage ───────────────────────────────────────────────────────
@@ -110,6 +114,7 @@ def register_workflow(
     queue: str = "default",
     dependencies: dict = None,
     parameters: Optional[Type[pydantic.BaseModel]] = None,
+    outputs: Optional[Type] = None,
 ) -> Callable:
     """Decorator that registers a function as a workflow.
 
@@ -119,6 +124,7 @@ def register_workflow(
     ...     name="myapp.analyse",
     ...     display_name="Analyse",
     ...     parameters=MyParams,
+    ...     outputs=MyOutputs,
     ... )
     ... def analyse(context):
     ...     ...
@@ -131,6 +137,7 @@ def register_workflow(
             queue=queue,
             dependencies=dependencies or {},
             parameters=parameters,
+            outputs=outputs,
         )
         _register_entry(entry)
         return fn
