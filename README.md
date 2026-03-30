@@ -22,22 +22,26 @@ pip install muflows[dev]
 
 ### WorkflowContext
 
-Abstract interface (Protocol) for file I/O that workflow implementations use. The context is passed to `WorkflowImplementation.execute(context)` and provides storage, dependency access, and progress reporting. This allows the same workflow code to run on different backends without modification.
+The `WorkflowContext` class wraps a `StorageBackend` and provides file I/O, dependency access, progress reporting, and workflow parameters. The same context class works with any storage backend (local filesystem or S3).
 
-The `context/` package is split into separate modules:
+The `context/` package is split into:
 
 - `context/base.py` — `WorkflowContext` protocol definition (the abstract interface)
-- `context/local.py` — `LocalFolderContext` (local filesystem, for testing and local execution)
-- `context/s3.py` — `S3WorkflowContext` (direct S3 access, for Lambda/Batch)
+- `context/workflow.py` — `WorkflowContext` implementation and `create_local_context()` factory
 
-Domain-specific contexts (e.g. `DjangoWorkflowContext` in topobank, `TopographyContext` in sds-workflows) extend `LocalFolderContext` or implement the protocol directly, adding domain properties like `topography` or `topography_name`.
+The `storage/` package provides backend implementations:
+
+- `storage/local.py` — `LocalStorageBackend` (local filesystem)
+- `storage/s3.py` — `S3StorageBackend` (AWS S3)
+
+Domain-specific contexts (e.g. `DjangoWorkflowContext` in topobank, `TopographyContext` in sds-workflows) extend `WorkflowContext` or implement the protocol directly.
 
 ```python
-from muflow import LocalFolderContext
+from muflow import create_local_context
 import xarray as xr
 
-# Create a context
-ctx = LocalFolderContext(
+# Create a context for local testing
+ctx = create_local_context(
     path="/tmp/workflow-output",
     kwargs={"param1": "value1"},
 )

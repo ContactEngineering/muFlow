@@ -4,7 +4,7 @@ from typing import Union
 
 import pytest
 
-from muflow import LocalFolderContext, WorkflowContext, WorkflowImplementation
+from muflow import create_local_context, WorkflowContext, WorkflowImplementation
 
 
 class SimpleWorkflow(WorkflowImplementation):
@@ -54,7 +54,7 @@ class TestWorkflowImplementation:
 
     def test_execute_with_context(self, tmp_path):
         """Test executing a workflow with a context."""
-        context = LocalFolderContext(
+        context = create_local_context(
             path=tmp_path,
             kwargs={"multiplier": 2.0},
         )
@@ -70,7 +70,7 @@ class TestWorkflowImplementation:
 
     def test_execute_with_default_kwargs(self, tmp_path):
         """Test executing with default parameter values."""
-        context = LocalFolderContext(
+        context = create_local_context(
             path=tmp_path,
             kwargs={},
         )
@@ -128,14 +128,14 @@ class TestWorkflowImplementation:
 
 
 class TestWorkflowIntegration:
-    """Integration tests for workflows with LocalFolderContext."""
+    """Integration tests for workflows with local contexts."""
 
     def test_workflow_reads_dependency(self, tmp_path):
         """Test workflow that reads from a dependency."""
         # Create dependency output
         dep_path = tmp_path / "dependency"
         dep_path.mkdir()
-        dep_context = LocalFolderContext(
+        dep_context = create_local_context(
             path=dep_path,
             kwargs={},
         )
@@ -154,7 +154,7 @@ class TestWorkflowIntegration:
         # Create main context with dependency
         main_path = tmp_path / "main"
         main_path.mkdir()
-        context = LocalFolderContext(
+        context = create_local_context(
             path=main_path,
             kwargs={},
             dependency_paths={"features": str(dep_path)},
@@ -178,7 +178,7 @@ class TestWorkflowIntegration:
                     context.report_progress(i + 1, 3, f"Step {i + 1}")
                 return {"steps": 3}
 
-        context = LocalFolderContext(
+        context = create_local_context(
             path=tmp_path,
             kwargs={},
         )
@@ -188,7 +188,7 @@ class TestWorkflowIntegration:
 
         assert result == {"steps": 3}
 
-        # LocalFolderContext prints progress
+        # WorkflowContext prints progress by default
         captured = capsys.readouterr()
         assert "33.3%" in captured.out
         assert "66.7%" in captured.out

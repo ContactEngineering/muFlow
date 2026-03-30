@@ -6,10 +6,13 @@ run on multiple backends (Celery, AWS Lambda, AWS Batch) without modification.
 Core Concepts
 -------------
 WorkflowContext
-    Abstract interface for file I/O that workflow implementations use.
-    Implementations include S3WorkflowContext (for Lambda/Batch) and
-    LocalFolderContext (for testing). Django integration (DjangoWorkflowContext)
-    lives in topobank, not here.
+    Unified context class for workflow file I/O, dependency access, and
+    progress reporting. Works with any StorageBackend (LocalStorageBackend,
+    S3StorageBackend).
+
+StorageBackend
+    Abstract interface for file storage. Implementations include
+    LocalStorageBackend (filesystem) and S3StorageBackend (AWS S3).
 
 WorkflowPlan
     A static DAG representing the complete execution plan. Built once upfront
@@ -17,15 +20,15 @@ WorkflowPlan
 
 ExecutionBackend
     Interface for dispatching workflow nodes to different compute backends.
-    Implementations include LambdaBackend (here) and CeleryBackend (in topobank).
+    Implementations include LambdaBackend and CeleryBackend.
 
 Example
 -------
->>> from muflow import LocalFolderContext
+>>> from muflow import create_local_context
 >>> import xarray as xr
 >>>
 >>> # Create a context for testing
->>> ctx = LocalFolderContext(
+>>> ctx = create_local_context(
 ...     path="/tmp/workflow-output",
 ...     kwargs={"param1": "value1"},
 ... )
@@ -49,13 +52,10 @@ from muflow.storage import (
     compute_prefix,
 )
 
-# Core context abstractions
+# Core context
 from muflow.context import (
     WorkflowContext,
-    ParameterizedMixin,
     create_local_context,
-    LocalFolderContext,
-    S3WorkflowContext,
 )
 
 # Plan data structures
@@ -112,10 +112,7 @@ __all__ = [
     "compute_prefix",
     # Context
     "WorkflowContext",
-    "ParameterizedMixin",
     "create_local_context",
-    "LocalFolderContext",  # Deprecated
-    "S3WorkflowContext",  # Deprecated
     # Workflow
     "WorkflowImplementation",
     # Outputs

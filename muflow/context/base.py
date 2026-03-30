@@ -4,13 +4,12 @@ The WorkflowContext protocol defines the base interface that workflow
 functions receive.  It provides file I/O (delegated to a storage backend),
 dependency access, and progress reporting.
 
-The protocol is deliberately agnostic of workflow parameters.  Contexts
-that carry parameters use the ``ParameterizedMixin`` from
-``muflow.context.parameterized``.
-
-The protocol is also domain-agnostic.  Domain-specific contexts
+The protocol is deliberately domain-agnostic.  Domain-specific contexts
 (e.g. TopographyContext, SurfaceContext) are defined downstream in
 sds-workflows, not here.
+
+The concrete ``WorkflowContext`` class in ``workflow.py`` implements this
+protocol and adds parameter support (``kwargs`` and ``parameters``).
 """
 
 from __future__ import annotations
@@ -31,8 +30,8 @@ class WorkflowContext(Protocol):
     file I/O to the storage backend, which enforces path traversal
     protection, write-once semantics, and protected files.
 
-    Workflow parameters (``kwargs`` / ``parameters``) are NOT part of this
-    protocol.  Use ``ParameterizedMixin`` if your context needs them.
+    The concrete ``WorkflowContext`` class adds parameters via ``kwargs``
+    and ``parameters`` properties, but these are not part of this protocol.
     """
 
     @property

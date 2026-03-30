@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from muflow import LocalFolderContext, WorkflowImplementation
+from muflow import create_local_context, WorkflowImplementation
 from muflow.executor import ExecutionPayload, ExecutionResult, execute_workflow
 
 
@@ -170,7 +170,7 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
@@ -191,7 +191,7 @@ class TestExecuteWorkflow:
                 kwargs={"user_id": 1},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
 
             execute_workflow(payload, ctx, get_test_implementation)
 
@@ -209,7 +209,7 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
@@ -226,7 +226,7 @@ class TestExecuteWorkflow:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             execute_workflow(payload, ctx, get_test_implementation)
 
@@ -242,7 +242,7 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, get_test_implementation)
 
@@ -268,7 +268,7 @@ class TestExecuteWorkflow:
                 storage_prefix=tmpdir,
             )
 
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             result = execute_workflow(payload, ctx, lambda name: registry[name])
 

@@ -2,7 +2,7 @@
 
 This module provides a CeleryBackend that executes workflows without database
 access, paralleling the LambdaBackend. Workers receive serialized ExecutionPayload
-and use S3WorkflowContext for all I/O.
+and use WorkflowContext with S3StorageBackend for all I/O.
 
 This enables:
 - Same workflow code running on Celery, Lambda, or local without modification
@@ -26,7 +26,7 @@ class CeleryBackend:
 
     Unlike Django's CeleryBackend which only passes analysis_id and looks up
     data from the database, this backend passes the full ExecutionPayload.
-    Workers execute without database access using S3WorkflowContext.
+    Workers execute without database access using WorkflowContext with S3StorageBackend.
 
     Parameters
     ----------
@@ -160,7 +160,7 @@ def create_celery_task(
 
     This is a factory function that creates a Celery task configured
     with a registry of available workflow implementations. The task
-    uses S3WorkflowContext for all I/O, with no database access.
+    uses WorkflowContext with S3StorageBackend for all I/O, with no database access.
 
     Similar to create_lambda_handler() but for Celery workers.
 

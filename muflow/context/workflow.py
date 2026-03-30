@@ -1,7 +1,6 @@
 """Unified workflow context.
 
-A single WorkflowContext class that works with any StorageBackend,
-eliminating the need for separate LocalFolderContext and S3WorkflowContext.
+A single WorkflowContext class that works with any StorageBackend.
 """
 
 from __future__ import annotations
@@ -10,7 +9,6 @@ from typing import IO, Any, Callable, Dict, Optional
 
 import xarray as xr
 
-from muflow.context.parameterized import ParameterizedMixin
 from muflow.storage.base import StorageBackend
 
 
@@ -20,24 +18,31 @@ def _print_progress(current: int, total: int, message: str) -> None:
     print(f"[{pct:.1f}%] {message}")
 
 
-class WorkflowContext(ParameterizedMixin):
+class WorkflowContext:
     """Unified workflow context that works with any StorageBackend.
 
-    This single context class replaces both LocalFolderContext and
-    S3WorkflowContext. It delegates all file I/O to a StorageBackend
-    and handles dependency access and progress reporting.
+    This context class handles file I/O (delegated to a StorageBackend),
+    dependency access, progress reporting, and workflow parameters.
 
     Parameters
     ----------
     storage : StorageBackend
         The storage backend for file I/O (LocalStorageBackend, S3StorageBackend, etc.)
     kwargs : dict
-        Workflow parameters.
+        Workflow parameters (raw dict).
     dependency_storages : dict[str, StorageBackend], optional
         Mapping from dependency key to storage backend for that dependency.
     progress_reporter : callable, optional
         Function called with (current, total, message) for progress updates.
         Defaults to printing to stdout.
+
+    Attributes
+    ----------
+    kwargs : dict
+        Raw parameters dict.
+    parameters : Any
+        Validated parameters (pydantic model), set by the executor after
+        validation. ``None`` if no parameter model is registered.
 
     Example
     -------
@@ -65,6 +70,20 @@ class WorkflowContext(ParameterizedMixin):
         self._dependency_storages = dependency_storages or {}
         self._progress_reporter = progress_reporter or _print_progress
         self._parameters = None  # Set by executor for function-based workflows
+
+    # ── Parameters ──────────────────────────────────────────────────────
+
+    @property
+    def kwargs(self) -> dict:
+        """Raw parameters dict."""
+        return self._kwargs
+
+    @property
+    def parameters(self) -> Any:
+        """Validated parameters (pydantic model), or ``None``."""
+        return self._parameters
+
+    # ── Storage ─────────────────────────────────────────────────────────
 
     @property
     def storage(self) -> StorageBackend:
@@ -162,8 +181,6 @@ def create_local_context(
     dependency_paths: dict = None,
 ) -> WorkflowContext:
     """Create a WorkflowContext backed by local filesystem.
-
-    Convenience function that replaces LocalFolderContext.
 
     Parameters
     ----------

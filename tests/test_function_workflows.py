@@ -5,7 +5,7 @@ import tempfile
 import pydantic
 import pytest
 
-from muflow import LocalFolderContext
+from muflow import create_local_context
 from muflow.executor import ExecutionPayload, execute_workflow
 from muflow.registry import (
     AlreadyRegisteredException,
@@ -125,7 +125,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             result = execute_workflow(
                 payload, ctx, lambda name: get(name)
@@ -154,7 +154,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={"scale": 2.5},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
 
             result = execute_workflow(
                 payload, ctx, lambda name: get(name)
@@ -182,7 +182,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={},  # Missing required_field
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs=payload.kwargs)
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
 
             result = execute_workflow(
                 payload, ctx, lambda name: get(name)
@@ -202,7 +202,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             result = execute_workflow(
                 payload, ctx, lambda name: get(name)
@@ -222,7 +222,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             execute_workflow(payload, ctx, lambda name: get(name))
 
@@ -241,7 +241,7 @@ class TestFunctionWorkflowExecution:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
             result = execute_workflow(
                 payload, ctx, lambda name: get(name)
             )
@@ -270,7 +270,7 @@ class TestLegacyClassViaExecutor:
                 kwargs={},
                 storage_prefix=tmpdir,
             )
-            ctx = LocalFolderContext(path=tmpdir, kwargs={})
+            ctx = create_local_context(path=tmpdir, kwargs={})
 
             # Pass a raw class (not a WorkflowEntry) — executor wraps it
             result = execute_workflow(

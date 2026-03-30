@@ -2,10 +2,10 @@
 
 This module provides the core execution function that is completely
 database-agnostic. The same function can be called from:
-- Celery tasks (with DjangoWorkflowContext)
-- AWS Lambda handlers (with S3WorkflowContext)
-- AWS Batch jobs (with S3WorkflowContext)
-- Local testing (with LocalFolderContext)
+- Celery tasks (with WorkflowContext + S3StorageBackend)
+- AWS Lambda handlers (with WorkflowContext + S3StorageBackend)
+- AWS Batch jobs (with WorkflowContext + S3StorageBackend)
+- Local testing (with create_local_context)
 
 The execution layer has no knowledge of Django, database models, or
 TopoBank-specific concepts like "subjects". All domain-specific logic
