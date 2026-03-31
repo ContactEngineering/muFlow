@@ -119,14 +119,12 @@ task_id = backend.submit(analysis_id=123, payload={
 muFlows uses deterministic, content-addressed storage prefixes:
 
 ```python
-from muflows import compute_storage_prefix
+from muflow import compute_prefix
 
-prefix = compute_storage_prefix(
-    function_name="my.workflow",
-    subject_key="data:123",
-    kwargs={"param": "value"},
+prefix = compute_prefix(
+    {"workflow": "my.workflow", "subject": "data:123", "param": "value"},
 )
-# Returns: "data-lake/results/my.workflow/a1b2c3d4..."
+# Returns: "muflow/my.workflow/a1b2c3d4..."
 ```
 
 Same inputs always produce the same prefix, enabling automatic caching.

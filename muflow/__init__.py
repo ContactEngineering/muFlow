@@ -66,12 +66,7 @@ from muflow.executor import ExecutionPayload, ExecutionResult, execute_workflow
 from muflow.outputs import OutputFile, get_outputs_schema
 
 # Plan data structures
-from muflow.plan import (
-    WorkflowNode,
-    WorkflowPlan,
-    compute_node_key,
-    compute_storage_prefix,
-)
+from muflow.plan import WorkflowNode, WorkflowPlan
 
 # Planner
 from muflow.planner import WorkflowPlanner, get_dependency_access_map
@@ -137,8 +132,6 @@ __all__ = [
     # Plan
     "WorkflowNode",
     "WorkflowPlan",
-    "compute_storage_prefix",
-    "compute_node_key",
     # Planner
     "WorkflowPlanner",
     "get_dependency_access_map",

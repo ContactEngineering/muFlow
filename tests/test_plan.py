@@ -4,89 +4,69 @@ import json
 
 import pytest
 
-from muflow import (
-    WorkflowNode,
-    WorkflowPlan,
-    compute_node_key,
-    compute_storage_prefix,
-)
+from muflow import WorkflowNode, WorkflowPlan, compute_prefix
 
 
-class TestComputeStoragePrefix:
-    """Tests for compute_storage_prefix()."""
+class TestComputePrefix:
+    """Tests for compute_prefix()."""
 
     def test_deterministic(self):
         """Same inputs should produce same prefix."""
-        prefix1 = compute_storage_prefix(
-            "my.workflow",
-            "subject:123",
-            {"param": "value"},
-        )
-        prefix2 = compute_storage_prefix(
-            "my.workflow",
-            "subject:123",
-            {"param": "value"},
-        )
+        hash_dict = {
+            "workflow": "my.workflow",
+            "subject": "subject:123",
+            "param": "value",
+        }
+        prefix1 = compute_prefix(hash_dict)
+        prefix2 = compute_prefix(hash_dict)
         assert prefix1 == prefix2
 
     def test_different_function_different_prefix(self):
         """Different function names should produce different prefixes."""
-        prefix1 = compute_storage_prefix("workflow.a", "subject:123", {})
-        prefix2 = compute_storage_prefix("workflow.b", "subject:123", {})
+        prefix1 = compute_prefix({"workflow": "workflow.a", "subject": "subject:123"})
+        prefix2 = compute_prefix({"workflow": "workflow.b", "subject": "subject:123"})
         assert prefix1 != prefix2
 
     def test_different_subject_different_prefix(self):
         """Different subjects should produce different prefixes."""
-        prefix1 = compute_storage_prefix("my.workflow", "subject:123", {})
-        prefix2 = compute_storage_prefix("my.workflow", "subject:456", {})
+        prefix1 = compute_prefix({"workflow": "my.workflow", "subject": "subject:123"})
+        prefix2 = compute_prefix({"workflow": "my.workflow", "subject": "subject:456"})
         assert prefix1 != prefix2
 
     def test_different_kwargs_different_prefix(self):
         """Different kwargs should produce different prefixes."""
-        prefix1 = compute_storage_prefix("my.workflow", "subject:123", {"a": 1})
-        prefix2 = compute_storage_prefix("my.workflow", "subject:123", {"a": 2})
+        prefix1 = compute_prefix(
+            {"workflow": "my.workflow", "subject": "subject:123", "a": 1}
+        )
+        prefix2 = compute_prefix(
+            {"workflow": "my.workflow", "subject": "subject:123", "a": 2}
+        )
         assert prefix1 != prefix2
 
     def test_kwargs_order_independent(self):
         """Kwargs order should not affect prefix."""
-        prefix1 = compute_storage_prefix(
-            "my.workflow", "subject:123", {"a": 1, "b": 2}
+        prefix1 = compute_prefix(
+            {"workflow": "my.workflow", "subject": "subject:123", "a": 1, "b": 2}
         )
-        prefix2 = compute_storage_prefix(
-            "my.workflow", "subject:123", {"b": 2, "a": 1}
+        prefix2 = compute_prefix(
+            {"workflow": "my.workflow", "subject": "subject:123", "b": 2, "a": 1}
         )
         assert prefix1 == prefix2
 
     def test_includes_function_name(self):
         """Prefix should include function name for readability."""
-        prefix = compute_storage_prefix("sds_ml.v3.gpr.training", "tag:1", {})
+        prefix = compute_prefix(
+            {"workflow": "sds_ml.v3.gpr.training", "subject": "tag:1"}
+        )
         assert "sds_ml.v3.gpr.training" in prefix
 
     def test_custom_base_prefix(self):
         """Should support custom base prefix."""
-        prefix = compute_storage_prefix(
-            "my.workflow",
-            "subject:123",
-            {},
+        prefix = compute_prefix(
+            {"workflow": "my.workflow", "subject": "subject:123"},
             base_prefix="custom/prefix",
         )
         assert prefix.startswith("custom/prefix/")
-
-
-class TestComputeNodeKey:
-    """Tests for compute_node_key()."""
-
-    def test_deterministic(self):
-        """Same inputs should produce same key."""
-        key1 = compute_node_key("my.workflow", "subject:123", {"param": "value"})
-        key2 = compute_node_key("my.workflow", "subject:123", {"param": "value"})
-        assert key1 == key2
-
-    def test_human_readable(self):
-        """Key should be human-readable."""
-        key = compute_node_key("sds_ml.v3.gpr.training", "tag:42", {"n_folds": 5})
-        assert "sds_ml.v3.gpr.training" in key
-        assert "tag:42" in key
 
 
 class TestWorkflowNode:

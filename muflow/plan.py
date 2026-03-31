@@ -7,8 +7,6 @@ to execute the workflow on any backend.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Optional
 
 import pydantic
@@ -179,62 +177,3 @@ class WorkflowPlan(pydantic.BaseModel):
     def from_json(cls, s: str) -> WorkflowPlan:
         """Deserialize from JSON string."""
         return cls.model_validate_json(s)
-
-
-def compute_storage_prefix(
-    function_name: str,
-    subject_key: str,
-    kwargs: dict,
-    base_prefix: str = "muflow",
-) -> str:
-    """Compute deterministic, content-addressed storage prefix.
-
-    .. deprecated::
-        Use ``muflow.storage.compute_prefix`` instead.
-    """
-    import warnings
-
-    warnings.warn(
-        "compute_storage_prefix is deprecated. "
-        "Use muflow.storage.compute_prefix instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    from muflow.storage.base import compute_prefix
-
-    hash_dict = {
-        "workflow": function_name,
-        "subject": subject_key,
-        **kwargs,
-    }
-    return compute_prefix(hash_dict, base_prefix=base_prefix)
-
-
-def compute_node_key(
-    function_name: str,
-    subject_key: str,
-    kwargs: dict,
-) -> str:
-    """Compute a unique key for a workflow node.
-
-    .. deprecated::
-        Use ``muflow.storage.compute_prefix`` instead.
-    """
-    import warnings
-
-    warnings.warn(
-        "compute_node_key is deprecated. "
-        "Use muflow.storage.compute_prefix instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    from muflow.storage.base import compute_prefix
-
-    hash_dict = {
-        "workflow": function_name,
-        "subject": subject_key,
-        **kwargs,
-    }
-    prefix = compute_prefix(hash_dict)
-    # Return just the hash portion as a short key
-    return f"{function_name}/{subject_key}/{prefix.rsplit('/', 1)[-1][:8]}"
