@@ -103,6 +103,9 @@ from muflow.io import (
     save_xarray_to_bytes,
 )
 
+# Testing utilities
+from muflow.testing import LocalExecutionResult, run_plan_locally
+
 __all__ = [
     # Version
     "__version__",
@@ -146,6 +149,9 @@ __all__ = [
     "loads_json",
     "load_xarray_from_bytes",
     "save_xarray_to_bytes",
+    # Testing
+    "LocalExecutionResult",
+    "run_plan_locally",
 ]
 
 # Optional: LambdaBackend (requires boto3)

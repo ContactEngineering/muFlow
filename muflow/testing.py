@@ -1,0 +1,196 @@
+"""Testing utilities for muFlow.
+
+This module provides helper functions for running workflows in tests
+without manual dependency management.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from muflow.plan import WorkflowPlan
+
+_log = logging.getLogger(__name__)
+
+
+@dataclass
+class LocalExecutionResult:
+    """Result of a local workflow execution.
+
+    Attributes
+    ----------
+    success : bool
+        Whether all nodes executed successfully.
+    plan : WorkflowPlan
+        The executed plan.
+    output_dir : Path
+        Directory containing all outputs.
+    root_output_dir : Path
+        Directory containing root workflow outputs.
+    error : str | None
+        Error message if execution failed.
+    """
+
+    success: bool
+    plan: "WorkflowPlan"
+    output_dir: Path
+    root_output_dir: Path
+    error: Optional[str] = None
+
+    def read_json(self, filename: str) -> Any:
+        """Read a JSON file from the root workflow output.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the JSON file (e.g., "training_result.json").
+
+        Returns
+        -------
+        Any
+            Parsed JSON content.
+        """
+        path = self.root_output_dir / filename
+        with open(path) as f:
+            return json.load(f)
+
+    def read_file(self, filename: str) -> bytes:
+        """Read a file from the root workflow output.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file.
+
+        Returns
+        -------
+        bytes
+            File contents.
+        """
+        path = self.root_output_dir / filename
+        return path.read_bytes()
+
+    def list_files(self) -> list[str]:
+        """List files in the root workflow output directory.
+
+        Returns
+        -------
+        list[str]
+            List of filenames.
+        """
+        return [f.name for f in self.root_output_dir.iterdir() if f.is_file()]
+
+
+def run_plan_locally(
+    workflow_name: str,
+    subject_key: str,
+    kwargs: dict,
+    output_dir: str | Path,
+    verbose: bool = False,
+) -> LocalExecutionResult:
+    """Run a workflow with all dependencies computed automatically.
+
+    This is a convenience function for testing that:
+    1. Builds a complete execution plan (including all dependencies)
+    2. Executes all nodes using LocalBackend
+    3. Returns the result with easy access to outputs
+
+    Parameters
+    ----------
+    workflow_name : str
+        Name of the workflow (e.g., "sds_workflows.gpr_training").
+    subject_key : str
+        Subject identifier (e.g., "tag:123", "dataset:test").
+    kwargs : dict
+        Workflow parameters.
+    output_dir : str or Path
+        Directory for all workflow outputs.
+    verbose : bool
+        If True, print progress messages.
+
+    Returns
+    -------
+    LocalExecutionResult
+        Execution result with access to outputs.
+
+    Example
+    -------
+    >>> from muflow.testing import run_plan_locally
+    >>>
+    >>> result = run_plan_locally(
+    ...     workflow_name="sds_workflows.gpr_training",
+    ...     subject_key="dataset:test",
+    ...     kwargs={
+    ...         "dataset": {...},
+    ...         "property": "roughness",
+    ...         "features": [{"name": "sdsalgorithms.height"}],
+    ...     },
+    ...     output_dir="/tmp/test_output",
+    ... )
+    >>>
+    >>> if result.success:
+    ...     training_result = result.read_json("training_result.json")
+    ...     print(training_result["name"])
+    """
+    from muflow import WorkflowPlanner
+    from muflow.backends import LocalBackend
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build the plan
+    if verbose:
+        print(f"Planning {workflow_name}...")
+
+    planner = WorkflowPlanner(base_prefix=str(output_dir.absolute()))
+    plan = planner.build_plan(
+        workflow_name=workflow_name,
+        subject_key=subject_key,
+        kwargs=kwargs,
+    )
+
+    if verbose:
+        print(f"Plan has {len(plan.nodes)} nodes")
+
+    # Execute
+    if verbose:
+        print("Executing plan...")
+
+    backend = LocalBackend(base_path=str(output_dir.absolute()))
+
+    def on_complete(node_key: str):
+        if verbose:
+            print(f"  [DONE] {node_key[:50]}...")
+
+    def on_failure(node_key: str, error: str):
+        if verbose:
+            print(f"  [FAIL] {node_key[:50]}...: {error}")
+
+    try:
+        backend.submit_plan(
+            plan,
+            on_node_complete=on_complete,
+            on_node_failure=on_failure,
+        )
+        success = True
+        error = None
+    except RuntimeError as e:
+        success = False
+        error = str(e)
+
+    # Get root output directory
+    root_node = plan.nodes[plan.root_key]
+    root_output_dir = Path(root_node.storage_prefix)
+
+    return LocalExecutionResult(
+        success=success,
+        plan=plan,
+        output_dir=output_dir,
+        root_output_dir=root_output_dir,
+        error=error,
+    )

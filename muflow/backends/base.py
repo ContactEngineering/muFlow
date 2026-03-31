@@ -190,11 +190,12 @@ class LocalBackend:
                 for node in ready:
                     _log.debug(f"Executing node: {node.function} ({node.key[:16]}...)")
 
-                    # Build dependency paths
-                    dependency_paths = {
-                        dep_key: plan.nodes[dep_key].storage_prefix
-                        for dep_key in node.depends_on
-                    }
+                    # Build dependency paths using access keys (not node keys)
+                    from muflow.planner import get_dependency_access_map
+
+                    dependency_paths = get_dependency_access_map(
+                        plan, node.key, base_prefix=self.base_path
+                    )
 
                     # Create context
                     ctx = create_local_context(
