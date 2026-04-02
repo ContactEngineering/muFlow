@@ -13,7 +13,7 @@ base
     ``WorkflowContextProtocol`` — protocol for type checking.
 """
 
-from muflow.context.base import WorkflowContext as WorkflowContextProtocol
+from muflow.context.base import WorkflowContextProtocol
 from muflow.context.workflow import WorkflowContext, create_local_context
 
 __all__ = [

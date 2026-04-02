@@ -22,7 +22,7 @@ from muflow.storage.base import StorageBackend
 
 
 @runtime_checkable
-class WorkflowContext(Protocol):
+class WorkflowContextProtocol(Protocol):
     """Abstract interface for workflow execution contexts.
 
     A context wraps a ``StorageBackend`` and adds workflow-level concerns:
@@ -101,7 +101,7 @@ class WorkflowContext(Protocol):
         """Check if a dependency is available."""
         ...
 
-    def dependency(self, key: str) -> WorkflowContext:
+    def dependency(self, key: str) -> WorkflowContextProtocol:
         """Get a context for accessing a completed dependency's outputs."""
         ...
 
