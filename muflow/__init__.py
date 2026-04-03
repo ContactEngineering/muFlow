@@ -23,7 +23,7 @@ WorkflowPlanner
 
 ExecutionBackend
     Interface for dispatching workflow nodes to different compute backends.
-    Implementations include LambdaBackend and CeleryBackend.
+    Implementations include StepFunctionsBackend and CeleryBackend.
 
 Example
 -------
@@ -146,10 +146,10 @@ __all__ = [
     "run_plan_locally",
 ]
 
-# Optional: LambdaBackend (requires boto3)
+# Optional: StepFunctionsBackend (requires boto3)
 try:
-    from muflow.backends import LambdaBackend, create_lambda_handler  # noqa: F401
-    __all__.extend(["LambdaBackend", "create_lambda_handler"])
+    from muflow.backends import StepFunctionsBackend, create_lambda_handler  # noqa: F401
+    __all__.extend(["StepFunctionsBackend", "create_lambda_handler"])
 except ImportError:
     pass
 

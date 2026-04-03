@@ -33,7 +33,7 @@ class ExecutionBackend(Protocol):
     Implementations:
     - LocalBackend: Executes serially in-process (for testing/CLI)
     - CeleryBackend: Uses Celery chord/group for parallel execution
-    - LambdaBackend: Invokes Lambda with Step Functions orchestration
+    - StepFunctionsBackend: Step Functions orchestration + Lambda execution
     """
 
     def submit_plan(
