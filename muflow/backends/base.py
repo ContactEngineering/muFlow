@@ -112,12 +112,11 @@ class LocalBackend:
 
     Example
     -------
-    >>> from muflow import WorkflowPlanner, registry
+    >>> from muflow import Pipeline, Step
     >>> from muflow.backends import LocalBackend
     >>>
-    >>> # Build a plan
-    >>> planner = WorkflowPlanner(base_prefix="/tmp/output")
-    >>> plan = planner.build_plan("my_workflow", "subject:1", kwargs)
+    >>> # Build a plan from a pipeline
+    >>> plan = my_pipeline.build_plan("subject:1", kwargs, base_prefix="/tmp/output")
     >>>
     >>> # Execute locally
     >>> backend = LocalBackend("/tmp/output")

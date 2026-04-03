@@ -4,10 +4,9 @@ Backend-agnostic workflow execution engine.
 
 ## Overview
 
-muFlow provides abstractions for defining and executing workflows that can run on multiple backends (Celery, AWS Lambda, AWS Step Functions) without modification. It supports two complementary approaches to workflow composition:
+muFlow provides abstractions for defining and executing workflows that can run on multiple backends (Celery, AWS Lambda, AWS Step Functions) without modification.
 
-1. **Per-workflow declarations** — each workflow declares its own `dependencies` and `produces`, and the planner resolves the full DAG recursively.
-2. **Explicit pipelines** — workflows are pure computational units; a `Pipeline` definition declares the full DAG topology in one place.
+Workflows are registered as **pure computational units** via `@register_workflow`. DAG topology is declared separately in a **Pipeline** definition, keeping workflow logic decoupled from orchestration.
 
 ## Installation
 
@@ -24,34 +23,31 @@ pip install muflow[dev]
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        User Code                            │
-│  @register_workflow()    Pipeline(steps={...})               │
-└──────────┬───────────────────────┬──────────────────────────┘
-           │                       │
-           ▼                       ▼
-┌──────────────────┐    ┌──────────────────┐
-│ WorkflowPlanner  │    │ Pipeline.build() │
-│ (recursive DAG   │    │ (explicit DAG    │
-│  from deps/prods)│    │  from steps)     │
-└────────┬─────────┘    └────────┬─────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────────────────────────────┐
-│            WorkflowPlan (DAG)           │
-│  nodes: {key: WorkflowNode, ...}        │
-│  root_key: str                          │
-└────────────────┬────────────────────────┘
-                 │
-    ┌────────────┼────────────┐
-    ▼            ▼            ▼
-┌────────┐ ┌─────────┐ ┌──────────────┐
-│ Local  │ │ Celery  │ │ Step         │
-│Backend │ │ Backend │ │ Functions    │
-└────────┘ └─────────┘ └──────────────┘
+┌──────────────────────────────────────────────────┐
+│                    User Code                     │
+│  @register_workflow()    Pipeline(steps={...})    │
+└──────────────────────────┬───────────────────────┘
+                           │
+                           ▼
+              ┌──────────────────────┐
+              │  Pipeline.build_plan │
+              │  (compiles steps     │
+              │   into static DAG)   │
+              └──────────┬───────────┘
+                         │
+                         ▼
+              ┌──────────────────────┐
+              │   WorkflowPlan (DAG) │
+              │   nodes, root_key    │
+              └──────────┬───────────┘
+                         │
+            ┌────────────┼────────────┐
+            ▼            ▼            ▼
+      ┌────────┐  ┌─────────┐  ┌──────────────┐
+      │ Local  │  │ Celery  │  │ Step         │
+      │Backend │  │ Backend │  │ Functions    │
+      └────────┘  └─────────┘  └──────────────┘
 ```
-
-Both approaches produce the same `WorkflowPlan` — a static DAG of `WorkflowNode`s — so all backends work with either.
 
 ## Core Concepts
 
@@ -176,66 +172,15 @@ def generate_report(context):
             cv = context.dependency(key).read_json("cv_result.json")
 ```
 
-### Per-Workflow Dependency Declarations
-
-For simpler workflows, you can declare dependencies directly on each workflow:
-
-```python
-from muflow import register_workflow, WorkflowSpec
-
-@register_workflow(
-    name="ml.training",
-    dependencies={
-        "features": "ml.compute_features",  # simple string
-        "config": WorkflowSpec(              # explicit spec
-            workflow="ml.load_config",
-            kwargs={"version": "v2"},
-        ),
-    },
-    produces={
-        "report": "ml.generate_report",
-    },
-)
-def training(context):
-    features = context.dependency("features").read_json("features.json")
-    # ...
-```
-
-Dynamic enumeration is supported for fan-out/fan-in:
-
-```python
-def enumerate_surfaces(subject_key, kwargs):
-    return {
-        f"surface_{i}": WorkflowSpec(
-            workflow="ml.process_surface",
-            subject_key=f"surface:{s['id']}",
-        )
-        for i, s in enumerate(kwargs.get("surfaces", []))
-    }
-
-@register_workflow(
-    name="ml.aggregate",
-    dependencies=enumerate_surfaces,
-)
-def aggregate(context):
-    for key in context.dependency_keys():
-        data = context.dependency(key).read_json("result.json")
-```
-
 ### WorkflowPlan
 
-A static DAG representing the complete execution plan. Plans are computed once upfront and can be serialized as JSON.
+A static DAG representing the complete execution plan. Plans are compiled from a Pipeline definition once upfront and can be serialized as JSON.
 
 ```python
 from muflow import WorkflowPlan
 
 # Build from a pipeline
 plan = my_pipeline.build_plan("tag:1", {"param": "value"})
-
-# Or from per-workflow declarations
-from muflow import WorkflowPlanner
-planner = WorkflowPlanner()
-plan = planner.build_plan("ml.training", "tag:1", {"param": "value"})
 
 # Inspect the plan
 print(f"Total nodes: {len(plan.nodes)}")
@@ -324,13 +269,13 @@ pytest
 
 ### Testing Utilities
 
-muFlow provides utilities for testing workflows with automatic dependency resolution:
+muFlow provides utilities for testing pipelines locally:
 
 ```python
 from muflow import run_plan_locally
 
 result = run_plan_locally(
-    workflow_name="myapp.training",
+    pipeline=my_pipeline,
     subject_key="dataset:test",
     kwargs={"param": "value"},
     output_dir="/tmp/test_output",
