@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.1.0
+## v0.2.0 (not yet released)
+
+### Breaking changes
+
+- Removed `WorkflowContextProtocol`. Use `WorkflowContext` directly instead.
+
+## v0.1.0 (2026-04-04)
 
 Initial release.
 

@@ -8,18 +8,10 @@ import pytest
 import xarray as xr
 
 from muflow import WorkflowContext, create_local_context
-from muflow.context import WorkflowContextProtocol
 
 
 class TestWorkflowContext:
     """Tests for WorkflowContext."""
-
-    def test_implements_protocol(self):
-        """WorkflowContext should implement WorkflowContextProtocol."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            ctx = create_local_context(path=tmpdir, kwargs={})
-            assert isinstance(ctx, WorkflowContextProtocol)
-            assert isinstance(ctx, WorkflowContext)
 
     def test_storage_prefix(self):
         """storage_prefix should return the path."""

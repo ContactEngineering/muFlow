@@ -9,15 +9,11 @@ Modules
 workflow
     ``WorkflowContext`` — unified context class for all backends.
     ``create_local_context`` — convenience function for local testing.
-base
-    ``WorkflowContextProtocol`` — protocol for type checking.
 """
 
-from muflow.context.base import WorkflowContextProtocol
 from muflow.context.workflow import WorkflowContext, create_local_context
 
 __all__ = [
     "WorkflowContext",
-    "WorkflowContextProtocol",
     "create_local_context",
 ]
