@@ -30,7 +30,7 @@ __version__ = "0.1.0"
 from muflow import registry
 
 # Execution backends
-from muflow.backends import ExecutionBackend, LocalBackend
+from muflow.backends import ExecutionBackend, LocalBackend, PlanHandle
 
 # Core context
 from muflow.context import TaskContext, create_local_context
@@ -107,6 +107,7 @@ __all__ = [
     # Backends
     "ExecutionBackend",
     "LocalBackend",
+    "PlanHandle",
     # I/O
     "ExtendedJSONEncoder",
     "dumps_json",

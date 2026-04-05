@@ -29,9 +29,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
+    from muflow.backends.callbacks import CompletionCallback
+    from muflow.backends.handle import PlanHandle
     from muflow.plan import TaskNode, TaskPlan
 
 _log = logging.getLogger(__name__)
@@ -84,9 +86,8 @@ class CeleryBackend:
     def submit_plan(
         self,
         plan: "TaskPlan",
-        on_node_complete: Optional[Callable[[str], None]] = None,
-        on_node_failure: Optional[Callable[[str, str], None]] = None,
-    ) -> str:
+        completion_callback: Optional["CompletionCallback"] = None,
+    ) -> "PlanHandle":
         """Submit a task plan for parallel execution.
 
         Converts the DAG into Celery chord/group structures:
@@ -98,17 +99,28 @@ class CeleryBackend:
         ----------
         plan : TaskPlan
             Complete task plan.
-        on_node_complete : callable, optional
-            Not directly supported - use Celery signals or callbacks task.
-        on_node_failure : callable, optional
-            Not directly supported - use Celery signals or callbacks task.
+        completion_callback : CompletionCallback, optional
+            Called when the plan completes. Must be a
+            :class:`CeleryCompletionCallback` for async dispatch; passing
+            any other type raises ``TypeError``.
 
         Returns
         -------
-        str
-            Celery task ID for the outermost chord/group.
+        PlanHandle
+            Handle with backend="celery".
         """
-        # Compute execution levels (topological sort by depth)
+        from muflow.backends.callbacks import CeleryCompletionCallback
+        from muflow.backends.handle import PlanHandle
+
+        if completion_callback is not None and not isinstance(
+            completion_callback, CeleryCompletionCallback
+        ):
+            raise TypeError(
+                "CeleryBackend requires a CeleryCompletionCallback for async "
+                "dispatch. Pass a CeleryCompletionCallback or use PlanHandle "
+                "polling instead."
+            )
+
         levels = self._compute_levels(plan)
 
         _log.info(
@@ -116,15 +128,19 @@ class CeleryBackend:
             f"in {len(levels)} levels"
         )
 
-        # Build Celery task from levels
         celery_task = self._build_celery_task(levels, plan)
 
-        # Submit the task
+        # Wrap with completion notification if requested
+        if completion_callback is not None:
+            celery_task = self._wrap_with_completion(
+                celery_task, plan.root_key, completion_callback
+            )
+
         result = celery_task.apply_async()
         self._plan_results[result.id] = result
 
         _log.info(f"Submitted plan as Celery task {result.id}")
-        return result.id
+        return PlanHandle(backend="celery", plan_id=result.id)
 
     def get_plan_state(self, plan_id: str) -> str:
         """Get the state of a plan execution.
@@ -243,18 +259,49 @@ class CeleryBackend:
         if len(celery_groups) == 1:
             return celery_groups[0]
 
-        # Chain levels together using chord
-        # chord(group_a, group_b) means: run group_a, when ALL complete, run group_b
-        # For multiple levels: chord(g0, chord(g1, chord(g2, g3)))
-        # Or simpler: chain them with a dummy aggregator
-
-        # Build from the end backwards
+        # Build from the end backwards:
+        # chord(g0, chord(g1, chord(g2, g3)))
         result = celery_groups[-1]
         for grp in reversed(celery_groups[:-1]):
-            # chord(grp, result) - grp runs first, then result
             result = chord(grp, result)
 
         return result
+
+    def _wrap_with_completion(
+        self,
+        celery_task,
+        plan_id: str,
+        completion_callback: "CompletionCallback",
+    ):
+        """Wrap the task canvas with a completion notification chord.
+
+        The notification task (``muflow.send_completion``) is called after
+        the entire canvas finishes.  It dispatches the
+        :class:`CeleryCompletionCallback`'s target task.
+
+        Parameters
+        ----------
+        celery_task
+            The already-built Celery canvas.
+        plan_id : str
+            Plan root key, passed to the callback as ``plan_id``.
+        completion_callback : CeleryCompletionCallback
+            Callback to fire on success.
+
+        Returns
+        -------
+        celery.canvas.Signature
+            Wrapped canvas.
+        """
+        from celery import chord
+
+        notify_sig = self._app.signature(
+            "muflow.send_completion",
+            args=[plan_id, completion_callback._task_name, completion_callback._queue],
+            immutable=True,
+            queue=completion_callback._queue,
+        )
+        return chord(celery_task, notify_sig)
 
     def _make_node_task(self, node: "TaskNode", plan: "TaskPlan"):
         """Create a Celery task signature for a node.
@@ -299,7 +346,7 @@ def create_celery_task(
     celery_app,
     task_registry: Optional[dict] = None,
     task_name: str = "muflow.execute_node",
-):
+) -> object:
     """Create a Celery task for executing task nodes.
 
     This is a factory function that creates a Celery task configured
@@ -337,6 +384,37 @@ def create_celery_task(
 
     if task_registry is None:
         task_registry = registry.get_all()
+
+    @celery_app.task(name="muflow.send_completion")
+    def send_completion_task(
+        plan_id: str,
+        callback_task_name: str,
+        callback_queue: str,
+    ):
+        """Dispatch the completion callback task.
+
+        Called as a chord callback after all plan nodes complete
+        successfully.  Sends ``callback_task_name`` to ``callback_queue``
+        with ``(plan_id, True, None)`` as arguments.
+
+        Parameters
+        ----------
+        plan_id : str
+            Plan root key.
+        callback_task_name : str
+            Celery task name to call.
+        callback_queue : str
+            Queue to send it to.
+        """
+        celery_app.send_task(
+            callback_task_name,
+            args=[plan_id, True, None],
+            queue=callback_queue,
+        )
+        _log.info(
+            f"Sent completion notification for plan {plan_id} "
+            f"to {callback_task_name} on queue {callback_queue}"
+        )
 
     @celery_app.task(name=task_name, bind=True)
     def execute_node_task(

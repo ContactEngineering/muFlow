@@ -63,10 +63,10 @@ class TestLocalBackend:
 
             # Execute
             backend = LocalBackend(tmpdir, registry.get)
-            plan_id = backend.submit_plan(plan)
+            handle = backend.submit_plan(plan)
 
             # Verify
-            assert backend.get_plan_state(plan_id) == "success"
+            assert backend.get_plan_state(handle.plan_id) == "success"
             result_path = Path(tmpdir) / "node1" / "result.json"
             assert result_path.exists()
 
@@ -109,10 +109,10 @@ class TestLocalBackend:
             def on_complete(key):
                 completed_nodes.append(key)
 
-            plan_id = backend.submit_plan(plan, on_node_complete=on_complete)
+            handle = backend.submit_plan(plan, on_node_complete=on_complete)
 
             # Verify execution order
-            assert backend.get_plan_state(plan_id) == "success"
+            assert backend.get_plan_state(handle.plan_id) == "success"
             assert len(completed_nodes) == 4
 
             # Leaf nodes should complete before root
@@ -175,13 +175,13 @@ class TestLocalBackend:
             def on_complete(key):
                 completed_nodes.append(key)
 
-            plan_id = backend.submit_plan(plan, on_node_complete=on_complete)
+            handle = backend.submit_plan(plan, on_node_complete=on_complete)
 
             # All nodes complete (cached node completes instantly via manifest check)
             assert "cached" in completed_nodes
             assert "new" in completed_nodes
             assert "root" in completed_nodes
-            assert backend.get_plan_state(plan_id) == "success"
+            assert backend.get_plan_state(handle.plan_id) == "success"
 
             # Verify the cached node's original result.json was not overwritten
             original_result = _json.loads((cached_dir / "result.json").read_text())

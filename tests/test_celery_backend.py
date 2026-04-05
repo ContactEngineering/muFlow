@@ -313,20 +313,23 @@ class TestSubmitPlanEager:
         entry = TaskEntry(name=name, fn=fail)
         registry[name] = entry
 
-    def test_single_node_returns_plan_id(self, s3_env):
+    def test_single_node_returns_plan_handle(self, s3_env):
+        from muflow.backends.handle import PlanHandle
+
         backend, registry, s3 = s3_env
         self._register_noop(registry)
         plan = simple_plan()
-        plan_id = backend.submit_plan(plan)
-        assert isinstance(plan_id, str)
-        assert len(plan_id) > 0
+        handle = backend.submit_plan(plan)
+        assert isinstance(handle, PlanHandle)
+        assert handle.backend == "celery"
+        assert len(handle.plan_id) > 0
 
     def test_state_is_success_after_eager_submit(self, s3_env):
         backend, registry, s3 = s3_env
         self._register_noop(registry)
         plan = simple_plan()
-        plan_id = backend.submit_plan(plan)
-        assert backend.get_plan_state(plan_id) == "success"
+        handle = backend.submit_plan(plan)
+        assert backend.get_plan_state(handle.plan_id) == "success"
 
     def test_task_output_written_to_s3(self, s3_env):
         backend, registry, s3 = s3_env
@@ -345,8 +348,8 @@ class TestSubmitPlanEager:
         self._register_noop(registry, name="test.leaf")
         self._register_noop(registry, name="test.root")
         plan = fan_in_plan()
-        plan_id = backend.submit_plan(plan)
-        assert backend.get_plan_state(plan_id) == "success"
+        handle = backend.submit_plan(plan)
+        assert backend.get_plan_state(handle.plan_id) == "success"
 
         # Verify all 4 nodes wrote output
         resp = s3.list_objects_v2(Bucket="test-bucket", Prefix="muflow/")
