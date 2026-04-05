@@ -402,7 +402,6 @@ def create_celery_task(
                 "task_id": self.request.id,
                 "success": result.success,
                 "error_message": result.error_message,
-                "files_written": result.files_written,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             })
         except Exception as e:
@@ -420,10 +419,6 @@ def create_celery_task(
             )
             raise RuntimeError(result.error_message)
 
-        return {
-            "node_key": node_key,
-            "success": result.success,
-            "files_written": result.files_written,
-        }
+        return {"node_key": node_key}
 
     return execute_node_task

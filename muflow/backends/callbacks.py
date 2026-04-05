@@ -153,10 +153,7 @@ class LoggingCompletionCallback:
             Execution result.
         """
         if result.success:
-            self._log.info(
-                f"Task completed: analysis_id={analysis_id}, "
-                f"files_written={result.files_written}"
-            )
+            self._log.info(f"Task completed: analysis_id={analysis_id}")
         else:
             self._log.error(
                 f"Task failed: analysis_id={analysis_id}, "

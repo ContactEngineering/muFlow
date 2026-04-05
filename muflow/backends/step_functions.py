@@ -453,7 +453,7 @@ def create_lambda_handler(task_registry: Optional[dict] = None):
         Returns
         -------
         dict
-            ``{"status": "success", "node_key": …, "files_written": […]}``
+            ``{"status": "success", "node_key": …}``
 
         Raises
         ------
@@ -499,10 +499,6 @@ def create_lambda_handler(task_registry: Optional[dict] = None):
         if not result.success:
             raise RuntimeError(result.error_message)
 
-        return {
-            "status": "success",
-            "node_key": node_key,
-            "files_written": result.files_written,
-        }
+        return {"status": "success", "node_key": node_key}
 
     return handler

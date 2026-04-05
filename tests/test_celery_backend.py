@@ -424,7 +424,7 @@ class TestCreateCeleryTask:
             "dependency_prefixes": {},
         }
         result = task("node-key", payload_dict, "test-bucket")
-        assert result["success"] is True
+        assert result["node_key"] == "node-key"
 
     def test_execution_result_json_written(self, task_env):
         task, registry, s3 = task_env

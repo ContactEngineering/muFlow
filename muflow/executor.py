@@ -77,8 +77,6 @@ class ExecutionResult(pydantic.BaseModel):
         Error message if execution failed.
     error_traceback : str | None
         Full traceback if execution failed.
-    files_written : list[str]
-        List of output files that were written (from storage backend manifest).
     """
 
     model_config = pydantic.ConfigDict(extra="forbid")
@@ -87,7 +85,6 @@ class ExecutionResult(pydantic.BaseModel):
     cached: bool = False
     error_message: Optional[str] = None
     error_traceback: Optional[str] = None
-    files_written: list[str] = []
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -134,7 +131,7 @@ def execute_task(
 
     # Early exit: if results already exist at this prefix, skip execution
     if context.storage.is_cached():
-        return ExecutionResult(success=True, cached=True, files_written=[])
+        return ExecutionResult(success=True, cached=True)
 
     try:
         # Write context.json (protected, so use internal storage method if possible)
@@ -159,16 +156,12 @@ def execute_task(
         # Execute the task
         entry.fn(context)
 
-        return ExecutionResult(
-            success=True,
-            files_written=sorted(context.storage.written_files),
-        )
+        return ExecutionResult(success=True)
     except Exception as exc:
         return ExecutionResult(
             success=False,
             error_message=str(exc),
             error_traceback=traceback.format_exc(),
-            files_written=sorted(context.storage.written_files),
         )
     finally:
         # Always write the manifest, even on error
