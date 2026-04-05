@@ -140,7 +140,13 @@ class CeleryBackend:
         self._plan_results[result.id] = result
 
         _log.info(f"Submitted plan as Celery task {result.id}")
-        return PlanHandle(backend="celery", plan_id=result.id)
+        return PlanHandle(
+            backend="celery",
+            plan_id=result.id,
+            node_prefixes={k: n.storage_prefix for k, n in plan.nodes.items()},
+            storage_type="s3",
+            storage_config={"bucket": self._bucket},
+        )
 
     def get_plan_state(self, plan_id: str) -> str:
         """Get the state of a plan execution.

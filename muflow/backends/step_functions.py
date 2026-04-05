@@ -170,7 +170,13 @@ class StepFunctionsBackend:
             f"Started Step Functions execution: {execution_arn} "
             f"({len(plan.nodes)} nodes)"
         )
-        return PlanHandle(backend="step_functions", plan_id=execution_arn)
+        return PlanHandle(
+            backend="step_functions",
+            plan_id=execution_arn,
+            node_prefixes={k: n.storage_prefix for k, n in plan.nodes.items()},
+            storage_type="s3",
+            storage_config={"bucket": self._bucket},
+        )
 
     def get_plan_state(self, execution_arn: str) -> str:
         """Query the current state of a plan execution.

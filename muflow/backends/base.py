@@ -237,7 +237,13 @@ class LocalBackend:
             if completion_callback:
                 completion_callback.notify(plan_id, success=True)
 
-            return PlanHandle(backend="local", plan_id=plan_id)
+            return PlanHandle(
+                backend="local",
+                plan_id=plan_id,
+                node_prefixes={k: n.storage_prefix for k, n in plan.nodes.items()},
+                storage_type="local",
+                storage_config={},
+            )
 
         except Exception as exc:
             self._plan_states[plan_id] = "failure"
