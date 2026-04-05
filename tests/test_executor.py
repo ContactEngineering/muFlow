@@ -273,6 +273,44 @@ class TestExecuteTask:
             assert result.success is False
             assert "protected" in result.error_message
 
+    def test_cached_execution_skips_task(self):
+        """Should skip task execution when manifest.json already exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Pre-create a manifest to simulate a cached result
+            manifest_path = Path(tmpdir) / "manifest.json"
+            manifest_path.write_text('{"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"}')
+
+            payload = ExecutionPayload(
+                task_name="test.mock_task",
+                kwargs={"user_id": 99},
+                storage_prefix=tmpdir,
+            )
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
+
+            result = execute_task(payload, ctx, get_test_implementation)
+
+            assert result.success is True
+            assert result.cached is True
+            assert result.files_written == []
+
+            # Manifest should remain unchanged (not overwritten by execute_task)
+            assert manifest_path.read_text() == '{"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"}'
+
+    def test_normal_execution_has_cached_false(self):
+        """Normal (non-cached) execution should have cached=False."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            payload = ExecutionPayload(
+                task_name="test.mock_task",
+                kwargs={"user_id": 1},
+                storage_prefix=tmpdir,
+            )
+            ctx = create_local_context(path=tmpdir, kwargs=payload.kwargs)
+
+            result = execute_task(payload, ctx, get_test_implementation)
+
+            assert result.success is True
+            assert result.cached is False
+
     def test_executor_writes_context_json(self):
         """Should write context.json before execution."""
         with tempfile.TemporaryDirectory() as tmpdir:

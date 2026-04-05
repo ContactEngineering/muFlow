@@ -71,6 +71,8 @@ class ExecutionResult(pydantic.BaseModel):
     ----------
     success : bool
         Whether execution completed without error.
+    cached : bool
+        True if results already existed and execution was skipped.
     error_message : str | None
         Error message if execution failed.
     error_traceback : str | None
@@ -82,6 +84,7 @@ class ExecutionResult(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid")
 
     success: bool
+    cached: bool = False
     error_message: Optional[str] = None
     error_traceback: Optional[str] = None
     files_written: list[str] = []
@@ -128,6 +131,10 @@ def execute_task(
         Success status, any error information, and list of files written.
     """
     from muflow.registry import TaskEntry
+
+    # Early exit: if results already exist at this prefix, skip execution
+    if context.storage.is_cached():
+        return ExecutionResult(success=True, cached=True, files_written=[])
 
     try:
         # Write context.json (protected, so use internal storage method if possible)

@@ -141,8 +141,7 @@ class StepFunctionsBackend:
         Returns
         -------
         str
-            Step Functions execution ARN, or the sentinel
-            ``"cached-{root_key}"`` when every node is already cached.
+            Step Functions execution ARN.
         """
         has_callbacks = any(
             cb is not None
@@ -157,12 +156,6 @@ class StepFunctionsBackend:
 
         levels = self._compute_levels(plan)
         asl = self._build_asl(levels, plan)
-
-        if asl is None:
-            # Every node was already cached — nothing to run.
-            _log.info(f"Plan {plan.root_key[:24]}...: all nodes cached")
-            return f"cached-{plan.root_key}"
-
         sm_name = self._state_machine_name(plan.root_key)
         sm_arn = self._ensure_state_machine(sm_name, asl)
 
@@ -186,16 +179,13 @@ class StepFunctionsBackend:
         Parameters
         ----------
         execution_arn : str
-            ARN returned by :meth:`submit_plan`, or the ``"cached-…"`` sentinel.
+            ARN returned by :meth:`submit_plan`.
 
         Returns
         -------
         str
             One of: ``"pending"``, ``"running"``, ``"success"``, ``"failure"``.
         """
-        if execution_arn.startswith("cached-"):
-            return "success"
-
         resp = self._sfn.describe_execution(executionArn=execution_arn)
         return {
             "RUNNING": "running",
@@ -213,8 +203,6 @@ class StepFunctionsBackend:
         execution_arn : str
             ARN returned by :meth:`submit_plan`.
         """
-        if execution_arn.startswith("cached-"):
-            return
         self._sfn.stop_execution(
             executionArn=execution_arn,
             cause="Cancelled by muflow StepFunctionsBackend",
@@ -281,17 +269,16 @@ class StepFunctionsBackend:
         )
 
     def _compute_levels(self, plan: "TaskPlan") -> list[list["TaskNode"]]:
-        """Group non-cached nodes by execution level (topological sort).
+        """Group nodes by execution level (topological sort).
 
-        Level 0 contains nodes whose dependencies are all already cached or
-        have no dependencies.  Level N contains nodes whose dependencies are
-        all in levels < N.  Cached nodes are excluded from all levels.
+        Level 0 contains nodes with no dependencies.  Level N contains nodes
+        whose dependencies are all in levels < N.
 
         Raises ``ValueError`` on circular dependencies.
         """
         levels: list[list["TaskNode"]] = []
-        completed = {k for k, n in plan.nodes.items() if n.cached}
-        remaining = set(plan.nodes.keys()) - completed
+        completed: set[str] = set()
+        remaining = set(plan.nodes.keys())
 
         while remaining:
             ready = [
@@ -320,7 +307,7 @@ class StepFunctionsBackend:
         a Parallel state whose branches all run concurrently.  Levels are
         linked via ``Next`` pointers; the last level carries ``"End": true``.
 
-        Returns ``None`` when ``levels`` is empty (all nodes cached).
+        Returns ``None`` when ``levels`` is empty (empty plan).
         """
         if not levels:
             return None

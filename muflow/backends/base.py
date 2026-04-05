@@ -188,11 +188,9 @@ class LocalBackend:
         plan_id = plan.root_key
         self._plan_states[plan_id] = "running"
 
-        # Initialize completed set with cached nodes
-        completed = {k for k, n in plan.nodes.items() if n.cached}
+        completed: set[str] = set()
 
-        _log.info(f"Executing plan {plan_id} with {len(plan.nodes)} nodes "
-                  f"({len(completed)} cached)")
+        _log.info(f"Executing plan {plan_id} with {len(plan.nodes)} nodes")
 
         try:
             while not plan.is_complete(completed):

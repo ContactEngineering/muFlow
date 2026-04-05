@@ -5,7 +5,6 @@ import json
 import pytest
 
 from tests.conftest import (
-    all_cached_plan,
     fan_in_plan,
     linear_plan,
     simple_plan,
@@ -213,12 +212,6 @@ class TestSubmitPlan:
             assert "arn:aws:states" in execution_arn
             assert "exec-" in execution_arn
 
-    def test_all_cached_returns_sentinel(self, backend):
-        with mock_aws():
-            plan = all_cached_plan()
-            result = backend.submit_plan(plan)
-            assert result.startswith("cached-")
-
     def test_state_machine_created_with_correct_name(self, backend, sfn_client):
         with mock_aws():
             plan = simple_plan()
@@ -262,10 +255,6 @@ class TestSubmitPlan:
 
 
 class TestGetPlanState:
-    def test_cached_sentinel_returns_success(self, backend):
-        with mock_aws():
-            assert backend.get_plan_state("cached-anything") == "success"
-
     def test_running_execution(self, backend, sfn_client):
         with mock_aws():
             plan = simple_plan()
@@ -292,11 +281,6 @@ class TestGetPlanState:
 
 
 class TestCancelPlan:
-    def test_cached_sentinel_is_noop(self, backend):
-        with mock_aws():
-            # Should not raise
-            backend.cancel_plan("cached-anything")
-
     def test_stop_execution_called(self, backend, sfn_client):
         with mock_aws():
             plan = simple_plan()

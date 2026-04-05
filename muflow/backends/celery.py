@@ -119,11 +119,6 @@ class CeleryBackend:
         # Build Celery task from levels
         celery_task = self._build_celery_task(levels, plan)
 
-        if celery_task is None:
-            # All nodes are cached - nothing to execute
-            _log.info(f"Plan {plan.root_key[:16]}... - all nodes cached")
-            return f"cached-{plan.root_key}"
-
         # Submit the task
         result = celery_task.apply_async()
         self._plan_results[result.id] = result
@@ -144,9 +139,6 @@ class CeleryBackend:
         str
             One of: "pending", "running", "success", "failure"
         """
-        if plan_id.startswith("cached-"):
-            return "success"
-
         result = self._plan_results.get(plan_id)
         if result is None:
             # Try to get from Celery
@@ -181,9 +173,6 @@ class CeleryBackend:
         plan_id : str
             Plan execution ID (Celery task ID).
         """
-        if plan_id.startswith("cached-"):
-            return  # Nothing to cancel
-
         self._app.control.revoke(plan_id, terminate=True)
         _log.info(f"Cancelled plan {plan_id}")
 
@@ -205,28 +194,23 @@ class CeleryBackend:
         """
         levels: list[list["TaskNode"]] = []
         remaining = set(plan.nodes.keys())
-        completed = {k for k, n in plan.nodes.items() if n.cached}
+        completed: set[str] = set()
 
-        while remaining - completed:
-            # Find nodes whose deps are all complete
-            ready = []
-            for key in remaining - completed:
-                node = plan.nodes[key]
-                deps_satisfied = all(
-                    d in completed for d in node.depends_on
-                )
-                if deps_satisfied:
-                    ready.append(node)
+        while remaining:
+            ready = [
+                plan.nodes[key]
+                for key in remaining
+                if all(d in completed for d in plan.nodes[key].depends_on)
+            ]
 
             if not ready:
-                # Check for circular dependency
                 raise ValueError(
-                    f"Circular dependency detected. Remaining nodes: "
-                    f"{remaining - completed}"
+                    f"Circular dependency detected. Remaining nodes: {remaining}"
                 )
 
             levels.append(ready)
             completed.update(n.key for n in ready)
+            remaining -= {n.key for n in ready}
 
         return levels
 
@@ -246,26 +230,15 @@ class CeleryBackend:
 
         Returns
         -------
-        celery.canvas.Signature or None
-            Celery task signature, or None if all nodes are cached.
+        celery.canvas.Signature
+            Celery task signature.
         """
         from celery import chord, group
 
-        # Build groups for each level (excluding cached nodes)
         celery_groups = []
         for level in levels:
-            tasks = []
-            for node in level:
-                if node.cached:
-                    continue
-                task = self._make_node_task(node, plan)
-                tasks.append(task)
-
-            if tasks:
-                celery_groups.append(group(tasks))
-
-        if not celery_groups:
-            return None
+            tasks = [self._make_node_task(node, plan) for node in level]
+            celery_groups.append(group(tasks))
 
         if len(celery_groups) == 1:
             return celery_groups[0]
