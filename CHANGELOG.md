@@ -6,6 +6,11 @@
 
 - Renamed "workflow" to "task" across the entire codebase (`Workflow` -> `Task`, `@register_workflow` -> `@register_task`, etc.).
 - Removed `TaskContextProtocol`. Use `TaskContext` directly instead.
+- **Caching moved to execution time**: `Pipeline.build_plan()` no longer accepts an `is_cached` callback. Cache detection now happens automatically inside `execute_task()` — if `manifest.json` already exists at the task's storage prefix, the task is skipped without re-running. Remove any `is_cached=...` arguments from `build_plan()` calls and any `LocalStorageBackend.make_cache_checker()` / `is_result_cached()` usage.
+- `TaskNode.cached` field removed. Tasks are no longer pre-marked cached at plan-build time.
+- `run_plan_locally()` no longer accepts a `use_cache` parameter. Caching is always active and requires no configuration.
+- `LocalStorageBackend.make_cache_checker()` and `LocalStorageBackend.is_result_cached()` removed.
+- `ExecutionResult` gains a new `cached: bool` field (default `False`) indicating whether the task was skipped due to an existing result.
 
 ## v0.1.0 (2026-04-04)
 
