@@ -4,8 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from muflow.plan import TaskPlan
-
 celery_pkg = pytest.importorskip("celery", reason="celery required")
 
 from celery import Celery  # noqa: E402

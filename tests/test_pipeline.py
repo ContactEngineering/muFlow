@@ -164,7 +164,6 @@ class TestPipelineBuildPlan:
         assert node.kwargs == {"base": "param", "extra": "val"}
 
 
-
 class TestPipelineValidation:
     """Tests for pipeline validation."""
 

@@ -109,5 +109,3 @@ def diamond_plan() -> TaskPlan:
     )
     nodes = {n.key: n for n in [a, b, c, d]}
     return TaskPlan(nodes=nodes, root_key=d.key)
-
-
