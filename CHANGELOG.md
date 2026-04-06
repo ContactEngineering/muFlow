@@ -18,6 +18,8 @@
 
 ### New features
 
+- **`save_text` / `read_text`**: `StorageBackend`, `LocalStorageBackend`, `S3StorageBackend`, and `TaskContext` now expose `save_text(filename, data, encoding="utf-8")` for writing plain-text files, complementing the existing `save_file` (bytes), `save_json`, and `save_xarray`. `TaskContext` also adds `read_text(filename, encoding="utf-8")` as a convenience wrapper. This closes the gap with `OutputFile(file_type="text")`, which had no corresponding write method.
+- **`open_file` write-mode guard**: `open_file` is read-only by design. Both `LocalStorageBackend` and `S3StorageBackend` now raise `ValueError` if a write mode (`w`, `a`, or `x`) is passed. Previously `LocalStorageBackend` silently opened the file for writing while bypassing write-once semantics, `allowed_outputs` checks, and manifest tracking; `S3StorageBackend` silently discarded the write and returned a read buffer instead.
 - **`PlanHandle`**: serializable reference to a submitted plan execution. Call `handle.to_json()` to store it (e.g. in a Django model field) and `PlanHandle.from_json(s)` to restore it later. Methods:
   - `get_state() -> str` — `"pending"` | `"running"` | `"success"` | `"failure"`. For Celery hits Redis; for Step Functions calls `describe_execution`; never queries S3.
   - `get_progress() -> PlanProgress` — per-node completion based on `manifest.json` presence.

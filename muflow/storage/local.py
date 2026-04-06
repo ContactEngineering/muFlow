@@ -107,6 +107,15 @@ class LocalStorageBackend:
         path.write_text(dumps_json(data, indent=2))
         self._written_files.add(filename)
 
+    def save_text(self, filename: str, data: str, encoding: str = "utf-8") -> None:
+        validate_filename(filename)
+        validate_writable(filename, self._written_files)
+        self._validate_allowed(filename)
+        path = self._full_path(filename)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(data, encoding=encoding)
+        self._written_files.add(filename)
+
     def save_xarray(self, filename: str, dataset: xr.Dataset) -> None:
         validate_filename(filename)
         validate_writable(filename, self._written_files)
@@ -120,6 +129,10 @@ class LocalStorageBackend:
 
     def open_file(self, filename: str, mode: str = "r") -> IO:
         validate_filename(filename)
+        if "w" in mode or "a" in mode or "x" in mode:
+            raise ValueError(
+                "open_file is read-only. Use save_file() or save_text() to write files."
+            )
         return open(self._full_path(filename), mode)
 
     def read_file(self, filename: str) -> bytes:

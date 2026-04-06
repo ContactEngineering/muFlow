@@ -100,6 +100,17 @@ class S3StorageBackend:
         )
         self._written_files.add(filename)
 
+    def save_text(self, filename: str, data: str, encoding: str = "utf-8") -> None:
+        validate_filename(filename)
+        validate_writable(filename, self._written_files)
+        self._s3.put_object(
+            Bucket=self._bucket,
+            Key=self._key(filename),
+            Body=data.encode(encoding),
+            ContentType="text/plain",
+        )
+        self._written_files.add(filename)
+
     def save_xarray(self, filename: str, dataset: xr.Dataset) -> None:
         validate_filename(filename)
         validate_writable(filename, self._written_files)
@@ -116,6 +127,10 @@ class S3StorageBackend:
 
     def open_file(self, filename: str, mode: str = "r") -> IO:
         validate_filename(filename)
+        if "w" in mode or "a" in mode or "x" in mode:
+            raise ValueError(
+                "open_file is read-only. Use save_file() or save_text() to write files."
+            )
         obj = self._s3.get_object(Bucket=self._bucket, Key=self._key(filename))
         raw = obj["Body"].read()
         if "b" in mode:

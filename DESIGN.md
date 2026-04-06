@@ -41,9 +41,7 @@ Because the prefix is deterministic, the same task with the same inputs always m
 
 ## Caching
 
-### Design decision: cache detection at execution time, not plan-build time
-
-Early versions detected cached nodes during `Pipeline.build_plan()` via an `is_cached` callback, pre-marking `TaskNode.cached = True`. This was removed. Cache detection now happens inside `execute_task()` at the start of each node's execution:
+Cache detection happens inside `execute_task()` at the start of each node's execution:
 
 ```python
 def execute_task(payload, context, get_entry) -> ExecutionResult:
@@ -55,7 +53,7 @@ def execute_task(payload, context, get_entry) -> ExecutionResult:
         context.storage.write_manifest()      # always write on completion
 ```
 
-**Why:** The async backends (Celery, Step Functions) execute nodes in separate processes or Lambda functions. Those processes have no shared state with the process that built the plan — they only receive a serialised `ExecutionPayload`. Moving the cache check into the executor means it works identically on every backend without any plumbing changes. The `manifest.json` is the single source of truth for whether a node is complete.
+**Why:** The async backends (Celery, Step Functions) execute nodes in separate processes or Lambda functions. Those processes have no shared state with the process that built the plan — they only receive a serialised `ExecutionPayload`. Checking the cache inside the executor means it works identically on every backend without any plumbing changes. The `manifest.json` is the single source of truth for whether a node is complete.
 
 ### What `manifest.json` records
 
@@ -85,13 +83,24 @@ This is enforced structurally:
 
 **Why:** Return values would require every node's output to pass through the broker (Redis for Celery, Step Functions state for SFN), creating size limits and coupling the data path to the orchestration path. S3 / local filesystem are the right data path; the orchestration layer only needs to know success or failure.
 
+### File write methods
+
+`TaskContext` exposes four write methods, each corresponding to a valid `OutputFile.file_type`:
+
+| Method | Type | Backend behaviour |
+|--------|------|-------------------|
+| `save_json(filename, data)` | `"json"` | Serialises with custom encoder (NaN, numpy, datetime) |
+| `save_xarray(filename, dataset)` | `"netcdf"` | Writes NetCDF via xarray |
+| `save_text(filename, data, encoding="utf-8")` | `"text"` | Writes encoded string |
+| `save_file(filename, data: bytes)` | `"binary"` | Writes raw bytes |
+
+All four enforce the same safety invariants: filename validation, write-once semantics, and `allowed_outputs` restriction (Local only). `open_file` is read-only — passing a write mode raises `ValueError`.
+
 ---
 
 ## `PlanHandle`: abstracting the submitted plan ID
 
-`submit_plan()` returns a `PlanHandle` rather than a raw string. Before this change, each backend returned a different kind of string (a local root key, a Celery chord UUID, a Step Functions execution ARN) with no common interface.
-
-`PlanHandle` is a Pydantic model — fully JSON-serialisable. Typical Django pattern:
+`submit_plan()` returns a `PlanHandle` — a Pydantic model that is fully JSON-serialisable and provides a uniform interface regardless of which backend (Local, Celery, Step Functions) ran the plan. Typical Django pattern:
 
 ```python
 # In the view that kicks off a computation:
@@ -159,9 +168,9 @@ if progress.node_breakdown[plan.root_key]:
 
 ## Completion callbacks
 
-### Homogenised signature
+### Callback signature
 
-The original `CompletionCallback.notify(analysis_id: int, result: ExecutionResult)` embedded a domain concept (`analysis_id`) in the library. The signature is now:
+`CompletionCallback.notify` has the following signature:
 
 ```python
 def notify(self, plan_id: str, success: bool, error: Optional[str]) -> None
@@ -211,12 +220,3 @@ When a `Pipeline` has multiple terminal steps (steps with no dependents), `build
 - `PlanHandle.plan_id` — the local backend uses `root_key` as the plan ID.
 - Progress checking — the root node's storage prefix can be checked to answer "is the final result available?".
 
----
-
-## Future: Redis-based progress
-
-`ProgressChecker` is designed to accommodate a `RedisProgressChecker` for deployments where S3 HEAD latency is a concern or real-time push (SSE/WebSocket) is needed.
-
-For Celery deployments, Redis is already present as the broker. Workers would write `SADD muflow:completed:{plan_id} {prefix}` alongside `write_manifest()`. A `RedisProgressChecker` would replace N HEAD requests with a single `SMEMBERS` call.
-
-For real-time push, the Django SSE endpoint can `SUBSCRIBE muflow:plan:{plan_id}` and stream events to the client as they arrive, rather than polling. This requires additional worker-side instrumentation but no changes to the `ProgressChecker` interface.
