@@ -122,7 +122,8 @@ class TestLocalBackend:
                 assert leaf_idx < root_idx, "Leaf should complete before root"
 
     def test_execute_plan_with_cached_nodes(self):
-        """Nodes with existing manifest.json are detected as cached at execution time."""
+        """Nodes with existing manifest.json are detected as cached
+        at execution time."""
         import json as _json
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -133,7 +134,10 @@ class TestLocalBackend:
                 '{"id": "cached", "status": "completed"}'
             )
             (cached_dir / "manifest.json").write_text(
-                _json.dumps({"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"})
+                _json.dumps({
+                    "files": ["result.json"],
+                    "timestamp": "2024-01-01T00:00:00+00:00",
+                })
             )
 
             # Build plan — no cached=True field any more; caching is detected at runtime

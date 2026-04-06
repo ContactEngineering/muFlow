@@ -134,6 +134,58 @@ class LocalBackend:
         self.progress_reporter = progress_reporter
         self._plan_states: dict[str, str] = {}
 
+    def _execute_node(
+        self,
+        node,
+        plan_id,
+        completed,
+        on_node_start,
+        on_node_complete,
+        on_node_failure,
+        create_local_context,
+        ExecutionPayload,
+        execute_task,
+    ):
+        _log.debug(f"Executing node: {node.function} ({node.key[:16]}...)")
+
+        if on_node_start:
+            on_node_start(node.key)
+
+        dependency_paths = node.dependency_access_map
+
+        ctx = create_local_context(
+            path=node.storage_prefix,
+            kwargs=node.kwargs,
+            dependency_paths=dependency_paths,
+            progress_reporter=self.progress_reporter,
+        )
+
+        payload = ExecutionPayload(
+            task_name=node.function,
+            kwargs=node.kwargs,
+            storage_prefix=node.storage_prefix,
+            dependency_prefixes=dependency_paths,
+        )
+
+        result = execute_task(payload, ctx, self.registry_get)
+
+        if result.success:
+            completed.add(node.key)
+            _log.debug(f"Node completed: {node.key[:16]}...")
+            if on_node_complete:
+                on_node_complete(node.key)
+        else:
+            self._plan_states[plan_id] = "failure"
+            _log.error(
+                f"Node failed: {node.key[:16]}... - {result.error_message}"
+            )
+            if on_node_failure:
+                on_node_failure(node.key, result.error_message)
+            raise RuntimeError(
+                f"Node {node.function} failed: {result.error_message}\n"
+                f"{result.error_traceback or ''}"
+            )
+
     def submit_plan(
         self,
         plan: "TaskPlan",
@@ -191,45 +243,17 @@ class LocalBackend:
                     )
 
                 for node in ready:
-                    _log.debug(f"Executing node: {node.function} ({node.key[:16]}...)")
-
-                    if on_node_start:
-                        on_node_start(node.key)
-
-                    dependency_paths = node.dependency_access_map
-
-                    ctx = create_local_context(
-                        path=node.storage_prefix,
-                        kwargs=node.kwargs,
-                        dependency_paths=dependency_paths,
-                        progress_reporter=self.progress_reporter,
+                    self._execute_node(
+                        node,
+                        plan_id,
+                        completed,
+                        on_node_start,
+                        on_node_complete,
+                        on_node_failure,
+                        create_local_context,
+                        ExecutionPayload,
+                        execute_task,
                     )
-
-                    payload = ExecutionPayload(
-                        task_name=node.function,
-                        kwargs=node.kwargs,
-                        storage_prefix=node.storage_prefix,
-                        dependency_prefixes=dependency_paths,
-                    )
-
-                    result = execute_task(payload, ctx, self.registry_get)
-
-                    if result.success:
-                        completed.add(node.key)
-                        _log.debug(f"Node completed: {node.key[:16]}...")
-                        if on_node_complete:
-                            on_node_complete(node.key)
-                    else:
-                        self._plan_states[plan_id] = "failure"
-                        _log.error(
-                            f"Node failed: {node.key[:16]}... - {result.error_message}"
-                        )
-                        if on_node_failure:
-                            on_node_failure(node.key, result.error_message)
-                        raise RuntimeError(
-                            f"Node {node.function} failed: {result.error_message}\n"
-                            f"{result.error_traceback or ''}"
-                        )
 
             self._plan_states[plan_id] = "success"
             _log.info(f"Plan {plan_id} completed successfully")

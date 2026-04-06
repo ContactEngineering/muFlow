@@ -181,5 +181,3 @@ class TestMLTaskReadyNodesProgression:
         completed.add(ready[0].key)
 
         assert plan.is_complete(completed)
-
-

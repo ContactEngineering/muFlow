@@ -1,8 +1,6 @@
 """Tests for muflow.storage.progress — ProgressChecker implementations."""
 
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 

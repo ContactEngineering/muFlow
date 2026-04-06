@@ -1,10 +1,6 @@
 """Tests for PlanHandle.get_progress() and PlanProgress."""
 
-import json
 import tempfile
-from pathlib import Path
-
-import pytest
 
 from muflow import TaskNode, TaskPlan
 from muflow.backends import LocalBackend
@@ -183,7 +179,6 @@ class TestLocalBackendProgress:
                 storage_prefix=f"{tmpdir}/n1",
                 depends_on=[],
             )
-            plan = TaskPlan(nodes={"n1": node}, root_key="n1")
             handle = LocalBackend(tmpdir, _REGISTRY.get).submit_plan(
                 TaskPlan(nodes={"n1": node}, root_key="n1")
             )

@@ -268,7 +268,10 @@ class TestExecuteTask:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Pre-create a manifest to simulate a cached result
             manifest_path = Path(tmpdir) / "manifest.json"
-            manifest_path.write_text('{"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"}')
+            _manifest = (
+                '{"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"}'
+            )
+            manifest_path.write_text(_manifest)
 
             payload = ExecutionPayload(
                 task_name="test.mock_task",
@@ -283,7 +286,7 @@ class TestExecuteTask:
             assert result.cached is True
 
             # Manifest should remain unchanged (not overwritten by execute_task)
-            assert manifest_path.read_text() == '{"files": ["result.json"], "timestamp": "2024-01-01T00:00:00+00:00"}'
+            assert manifest_path.read_text() == _manifest
 
     def test_normal_execution_has_cached_false(self):
         """Normal (non-cached) execution should have cached=False."""

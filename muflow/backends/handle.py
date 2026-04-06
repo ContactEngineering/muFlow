@@ -185,7 +185,8 @@ class PlanHandle(pydantic.BaseModel):
             app = self.__class__._celery_app
             if app is None:
                 raise RuntimeError(
-                    "No Celery app configured. Call PlanHandle.configure_celery(app) first."
+                    "No Celery app configured. "
+                    "Call PlanHandle.configure_celery(app) first."
                 )
             app.control.revoke(self.plan_id, terminate=True)
             _log.info(f"Cancelled Celery plan {self.plan_id}")
