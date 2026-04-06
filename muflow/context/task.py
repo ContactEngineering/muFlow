@@ -101,6 +101,10 @@ class TaskContext:
         """Save data as JSON."""
         self._storage.save_json(filename, data, allow_protected=allow_protected)
 
+    def save_text(self, filename: str, data: str, encoding: str = "utf-8") -> None:
+        """Save a string as a text file."""
+        self._storage.save_text(filename, data, encoding=encoding)
+
     def save_xarray(self, filename: str, dataset: xr.Dataset) -> None:
         """Save an xarray Dataset as NetCDF."""
         self._storage.save_xarray(filename, dataset)
@@ -112,6 +116,10 @@ class TaskContext:
     def read_file(self, filename: str) -> bytes:
         """Read raw bytes from a file."""
         return self._storage.read_file(filename)
+
+    def read_text(self, filename: str, encoding: str = "utf-8") -> str:
+        """Read a text file as a string."""
+        return self._storage.read_file(filename).decode(encoding)
 
     def read_json(self, filename: str) -> Any:
         """Read and parse a JSON file."""

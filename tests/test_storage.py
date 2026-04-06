@@ -112,6 +112,34 @@ class TestLocalStorageBackend:
         result = backend.read_xarray("model.nc")
         xr.testing.assert_equal(ds, result)
 
+    # ── text round-trip ─────────────────────────────────────────────────
+
+    def test_save_read_text(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        backend.save_text("note.txt", "hello world")
+        assert backend.read_file("note.txt").decode("utf-8") == "hello world"
+
+    def test_save_text_write_once(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        backend.save_text("note.txt", "first")
+        with pytest.raises(FileExistsError):
+            backend.save_text("note.txt", "second")
+
+    def test_save_text_protected(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        with pytest.raises(PermissionError, match="protected"):
+            backend.save_text("context.json", "{}")
+
+    def test_save_text_tracked(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        backend.save_text("note.txt", "hi")
+        assert "note.txt" in backend.written_files
+
+    def test_save_text_custom_encoding(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        backend.save_text("note.txt", "héllo", encoding="latin-1")
+        assert backend.read_file("note.txt").decode("latin-1") == "héllo"
+
     # ── open_file ───────────────────────────────────────────────────────
 
     def test_open_file(self, tmp_path):
@@ -119,6 +147,16 @@ class TestLocalStorageBackend:
         backend.save_file("text.txt", b"hello")
         with backend.open_file("text.txt", "r") as f:
             assert f.read() == "hello"
+
+    def test_open_file_write_mode_raises(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        with pytest.raises(ValueError, match="read-only"):
+            backend.open_file("out.txt", "w")
+
+    def test_open_file_append_mode_raises(self, tmp_path):
+        backend = LocalStorageBackend(tmp_path)
+        with pytest.raises(ValueError, match="read-only"):
+            backend.open_file("out.txt", "ab")
 
     # ── exists ──────────────────────────────────────────────────────────
 

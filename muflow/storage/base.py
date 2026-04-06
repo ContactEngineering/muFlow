@@ -160,6 +160,10 @@ class StorageBackend(Protocol):
         """Save raw bytes."""
         ...
 
+    def save_text(self, filename: str, data: str, encoding: str = "utf-8") -> None:
+        """Save a string as a text file."""
+        ...
+
     def save_json(
         self, filename: str, data: Any, allow_protected: bool = False
     ) -> None:
