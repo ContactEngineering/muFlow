@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- **Fixed critical caching bug**: `manifest.json` is now only written on successful task completion, ensuring that failed tasks can be safely retried.
+- **Dedicated error state**: Added a new `error.json` marker file written upon task failure, capturing the error message, traceback, and a `partial_manifest` of files written prior to failure.
+
 ## v0.2.0 (2026-04-07)
 
 ### Breaking changes

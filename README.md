@@ -217,6 +217,8 @@ prefix = compute_prefix(
 
 Caching is automatic and requires no configuration. When `execute_task()` runs a node, it first checks whether `manifest.json` already exists at the node's storage prefix. If it does, the task is skipped and marked cached — the node counts as completed and downstream tasks proceed normally.
 
+A `manifest.json` is only written upon successful task completion. If a task fails, an `error.json` marker file is written instead, enabling the node to correctly register as uncached and be automatically retried on subsequent runs.
+
 ```python
 # Re-running the same plan reuses any already-complete nodes automatically.
 plan = ml_pipeline.build_plan(

@@ -156,13 +156,24 @@ def execute_task(
         # Execute the task
         entry.fn(context)
 
+        # 1. Task succeeded! Write the manifest.
+        context.storage.write_manifest()
+
         return ExecutionResult(success=True)
     except Exception as exc:
+        # 2. Task failed! Write a dedicated error file instead of a manifest.
+        error_data = {
+            "error_message": str(exc),
+            "error_traceback": traceback.format_exc(),
+            "partial_manifest": {
+                "files": sorted(list(context.storage.written_files))
+            }
+        }
+        # Save error.json
+        context.storage.save_json("error.json", error_data, allow_protected=True)
+
         return ExecutionResult(
             success=False,
             error_message=str(exc),
             error_traceback=traceback.format_exc(),
         )
-    finally:
-        # Always write the manifest, even on error
-        context.storage.write_manifest()

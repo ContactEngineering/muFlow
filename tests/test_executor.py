@@ -205,8 +205,8 @@ class TestExecuteTask:
             assert result.error_traceback is not None
             assert "ValueError" in result.error_traceback
 
-    def test_failed_execution_still_writes_manifest(self):
-        """Should write manifest.json even on failure."""
+    def test_failed_execution_writes_error_json(self):
+        """Should write error.json and not write manifest.json on failure."""
         with tempfile.TemporaryDirectory() as tmpdir:
             payload = ExecutionPayload(
                 task_name="test.failing_task",
@@ -218,7 +218,13 @@ class TestExecuteTask:
             execute_task(payload, ctx, get_test_implementation)
 
             manifest_path = Path(tmpdir) / "manifest.json"
-            assert manifest_path.exists()
+            error_path = Path(tmpdir) / "error.json"
+            
+            assert not manifest_path.exists()
+            assert error_path.exists()
+            error_data = json.loads(error_path.read_text())
+            assert "error_message" in error_data
+            assert "partial_manifest" in error_data
 
     def test_unknown_task(self):
         """Should return failure for unknown task."""

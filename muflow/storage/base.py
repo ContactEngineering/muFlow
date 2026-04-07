@@ -218,6 +218,6 @@ class StorageBackend(Protocol):
     def write_manifest(self) -> None:
         """Write ``manifest.json`` listing all files written in this session.
 
-        Called by the executor after the task function returns (or raises).
+        Called by the executor after the task function completes successfully.
         """
         ...

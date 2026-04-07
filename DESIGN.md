@@ -66,9 +66,9 @@ def execute_task(payload, context, get_entry) -> ExecutionResult:
 
 Its *presence* is the cache signal. Its *contents* are metadata. A task is considered complete — and will be skipped on re-execution — if and only if `manifest.json` exists at its storage prefix.
 
-The `finally` block in `execute_task()` calls `write_manifest()` unconditionally — it runs whether the task succeeded or raised an exception. A failed task therefore also writes `manifest.json`, listing whatever files were written before the failure. Because `is_cached()` only checks for presence, that node will be treated as cached on any subsequent execution and silently skipped.
+The `execute_task()` function calls `write_manifest()` only when a task completes successfully. If a task fails, it catches the exception and writes an `error.json` file instead, containing the error message, traceback, and a `partial_manifest` listing whatever files were written before the failure. Because `is_cached()` only checks for the presence of `manifest.json`, a failed node will correctly return `False` for caching and can be retried safely.
 
-**Consequence:** a failed node cannot be re-executed automatically. To re-run it, the `manifest.json` (or the entire storage prefix) must be deleted first.
+**Consequence:** A failed node can be re-executed automatically without manual cleanup. The presence of `error.json` acts as a clear marker of failure, avoiding the need to parse metadata to determine the node's state.
 
 ---
 
