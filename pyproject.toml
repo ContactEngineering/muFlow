@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name = "muflow"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Backend-agnostic workflow execution engine"
 readme = "README.md"
 license = {text = "MIT"}
@@ -52,9 +52,14 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/ContactEngineering/muFlow"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["muflow*"]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+
+[tool.hatch.build.targets.wheel]
+packages = ["muflow"]
 
 [tool.black]
 line-length = 88
