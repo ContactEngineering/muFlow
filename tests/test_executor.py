@@ -219,7 +219,7 @@ class TestExecuteTask:
 
             manifest_path = Path(tmpdir) / "manifest.json"
             error_path = Path(tmpdir) / "error.json"
-            
+
             assert not manifest_path.exists()
             assert error_path.exists()
             error_data = json.loads(error_path.read_text())
